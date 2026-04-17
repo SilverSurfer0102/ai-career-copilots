@@ -1,0 +1,31 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Local data
+data/raw/
+data/uploads/
+data/private/
+outputs/
+tmp/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Model / cache
+models/
+.cache/
