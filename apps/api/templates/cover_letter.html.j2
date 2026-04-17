@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="{{ lang | default('en') }}">
+<head>
+<meta charset="UTF-8">
+<title>Cover Letter — {{ candidate_name }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Arial', 'Helvetica Neue', sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #1a1a1a;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 40px;
+    background: #ffffff;
+  }
+  .header { margin-bottom: 32px; }
+  .sender { font-size: 13pt; font-weight: 700; }
+  .contact { font-size: 10pt; color: #555; margin-top: 4px; }
+  .date { margin-top: 24px; font-size: 10.5pt; color: #555; }
+  .recipient { margin-top: 20px; font-size: 10.5pt; }
+  .subject { margin-top: 16px; font-weight: 700; font-size: 11pt; }
+  .body { margin-top: 24px; }
+  p { margin-bottom: 14px; font-size: 11pt; }
+  .closing { margin-top: 32px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="sender">{{ candidate_name }}</div>
+  {% if contact %}
+  <div class="contact">{{ contact }}</div>
+  {% endif %}
+  <div class="date">{{ date }}</div>
+  {% if recipient_name or company_name %}
+  <div class="recipient">
+    {% if recipient_name %}{{ recipient_name }}<br>{% endif %}
+    {% if company_name %}{{ company_name }}{% endif %}
+  </div>
+  {% endif %}
+  <div class="subject">Re: {{ position_title }}</div>
+</div>
+
+<div class="body">
+  {% for para in paragraphs %}
+  <p>{{ para.text }}</p>
+  {% endfor %}
+</div>
+
+<div class="closing">
+  <p>{{ closing_salutation }},</p>
+  <p><strong>{{ candidate_name }}</strong></p>
+</div>
+
+</body>
+</html>

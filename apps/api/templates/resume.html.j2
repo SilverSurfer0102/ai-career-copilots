@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="{{ lang | default('en') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ candidate_name }} — Resume</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Arial', 'Helvetica Neue', sans-serif;
+    font-size: 11pt;
+    line-height: 1.45;
+    color: #1a1a1a;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 36px 40px;
+    background: #ffffff;
+  }
+  h1 { font-size: 22pt; font-weight: 700; letter-spacing: -0.5px; color: #111; }
+  .contact { font-size: 10pt; color: #444; margin-top: 4px; }
+  .contact a { color: #444; text-decoration: none; }
+  .target-role { font-size: 12pt; color: #555; margin-top: 2px; font-style: italic; }
+  hr { border: none; border-top: 2px solid #1a1a1a; margin: 12px 0 8px 0; }
+  h2 {
+    font-size: 12pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 2px;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    color: #111;
+  }
+  .item { margin-bottom: 10px; }
+  .item-header { display: flex; justify-content: space-between; align-items: baseline; }
+  .item-title { font-weight: 700; font-size: 11pt; }
+  .item-subtitle { font-style: italic; color: #444; font-size: 10.5pt; }
+  .item-date { font-size: 10pt; color: #666; white-space: nowrap; }
+  .item-location { font-size: 10pt; color: #666; }
+  ul { margin-top: 4px; margin-left: 16px; }
+  li { margin-bottom: 2px; font-size: 10.5pt; }
+  .summary { margin-top: 8px; font-size: 11pt; color: #222; }
+  .skills-list { font-size: 10.5pt; }
+  .page-break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<h1>{{ candidate_name }}</h1>
+{% if target_role %}
+<div class="target-role">{{ target_role }}</div>
+{% endif %}
+{% if contact %}
+<div class="contact">{{ contact }}</div>
+{% endif %}
+
+{% if professional_summary %}
+<h2>Professional Summary</h2>
+<div class="summary">{{ professional_summary }}</div>
+{% endif %}
+
+{% for section in sections %}
+<h2>{{ section.title }}</h2>
+
+{% for item in section.items %}
+<div class="item">
+  <div class="item-header">
+    <div>
+      <span class="item-title">{{ item.title }}</span>
+      {% if item.subtitle %}
+        &nbsp;—&nbsp;<span class="item-subtitle">{{ item.subtitle }}</span>
+      {% endif %}
+    </div>
+    <div class="item-date">{{ item.date_range or '' }}</div>
+  </div>
+  {% if item.location %}
+  <div class="item-location">{{ item.location }}</div>
+  {% endif %}
+  {% if item.bullets %}
+  <ul>
+    {% for bullet in item.bullets %}
+    <li>{{ bullet.text if bullet is mapping else bullet }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if item.item_type == 'skill_group' and item.metadata %}
+  <div class="skills-list">
+    {% for group, skills in item.metadata.items() %}
+    <strong>{{ group }}:</strong> {{ skills | join(', ') }}<br>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endfor %}
+
+</body>
+</html>

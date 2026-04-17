@@ -28,4 +28,7 @@ tmp/
 
 # Model / cache
 models/
-.cache/
+.cache/*.egg-info/
+apps/api/.venv/
+apps/web/.next/
+apps/web/node_modules/
