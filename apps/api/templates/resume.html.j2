@@ -63,7 +63,7 @@
 {% for section in sections %}
 <h2>{{ section.title }}</h2>
 
-{% for item in section.items %}
+{% for item in section['items'] %}
 <div class="item">
   <div class="item-header">
     <div>

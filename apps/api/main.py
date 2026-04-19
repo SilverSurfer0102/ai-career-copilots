@@ -7,7 +7,7 @@ from config import settings
 from database import create_db_and_tables
 import models  # noqa: F401 — registers all SQLModel tables
 
-from routers import profiles, jobs, retrieval, generate, validate, export
+from routers import profiles, jobs, retrieval, generate, validate, export, blocks
 
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ app.include_router(retrieval.router, prefix="/retrieval", tags=["retrieval"])
 app.include_router(generate.router, prefix="/generate", tags=["generate"])
 app.include_router(validate.router, prefix="/validate", tags=["validate"])
 app.include_router(export.router, prefix="/export", tags=["export"])
+app.include_router(blocks.router, prefix="/profiles", tags=["blocks"])
 
 
 @app.get("/health", tags=["system"])

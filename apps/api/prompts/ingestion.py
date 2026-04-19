@@ -28,6 +28,13 @@ CRITICAL RULES:
 - Do not normalize or embellish company names, titles, or dates beyond what is written.
 - For academic documents: module names, course titles, and topics become skills (category: "domain") and education entries.
 - For papers: title, venue, abstract, keywords → publications; topics covered → skills.
+
+LANGUAGE HANDLING:
+- Documents may be written entirely in German. Extract all fields faithfully regardless of language.
+- Preserve German text in bullets, descriptions, and titles exactly as written (do not translate).
+- Recognize German terms: "Lebenslauf" (CV), "Studienhandbuch" (study guide), "Zeugnis/Urkunde/Diplom" (certificate),
+  "Praktikum" (internship), "Abschlussarbeit/Bachelorarbeit/Masterarbeit" (thesis).
+- German CEFR levels: Muttersprache → native, Verhandlungssicher → C1/C2, Fließend → B2/C1, Grundkenntnisse → A2/B1.
 """
 
 INGESTION_SCHEMA = """{

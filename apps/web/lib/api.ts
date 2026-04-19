@@ -12,6 +12,14 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function apiDelete(path: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`API ${res.status}: ${err}`);
+  }
+}
+
 // ── Profiles ────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -30,6 +38,13 @@ export const api = {
         (r) => r.json()
       );
     },
+    importFiles: (id: string, files: File[]) => {
+      const form = new FormData();
+      for (const file of files) form.append("files", file);
+      return fetch(`${API_BASE}/profiles/${id}/import-batch`, { method: "POST", body: form }).then(
+        (r) => r.ok ? r.json() as Promise<{ results: BatchImportResult[] }> : r.text().then((t) => Promise.reject(new Error(t)))
+      );
+    },
     addFreetext: (id: string, text: string, label: string) => {
       const form = new FormData();
       form.append("text", text);
@@ -38,6 +53,49 @@ export const api = {
         (r) => r.json()
       );
     },
+  },
+  blocks: {
+    createExperience: (pid: string, data: Partial<Experience>) =>
+      apiFetch<Experience>(`/profiles/${pid}/experiences`, { method: "POST", body: JSON.stringify(data) }),
+    updateExperience: (pid: string, id: string, data: Partial<Experience>) =>
+      apiFetch<Experience>(`/profiles/${pid}/experiences/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteExperience: (pid: string, id: string) => apiDelete(`/profiles/${pid}/experiences/${id}`),
+
+    createProject: (pid: string, data: Partial<Project>) =>
+      apiFetch<Project>(`/profiles/${pid}/projects`, { method: "POST", body: JSON.stringify(data) }),
+    updateProject: (pid: string, id: string, data: Partial<Project>) =>
+      apiFetch<Project>(`/profiles/${pid}/projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteProject: (pid: string, id: string) => apiDelete(`/profiles/${pid}/projects/${id}`),
+
+    createSkill: (pid: string, data: Partial<Skill>) =>
+      apiFetch<Skill>(`/profiles/${pid}/skills`, { method: "POST", body: JSON.stringify(data) }),
+    updateSkill: (pid: string, id: string, data: Partial<Skill>) =>
+      apiFetch<Skill>(`/profiles/${pid}/skills/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteSkill: (pid: string, id: string) => apiDelete(`/profiles/${pid}/skills/${id}`),
+
+    createEducation: (pid: string, data: Partial<Education>) =>
+      apiFetch<Education>(`/profiles/${pid}/educations`, { method: "POST", body: JSON.stringify(data) }),
+    updateEducation: (pid: string, id: string, data: Partial<Education>) =>
+      apiFetch<Education>(`/profiles/${pid}/educations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteEducation: (pid: string, id: string) => apiDelete(`/profiles/${pid}/educations/${id}`),
+
+    createLanguage: (pid: string, data: Partial<LanguageSkill>) =>
+      apiFetch<LanguageSkill>(`/profiles/${pid}/languages`, { method: "POST", body: JSON.stringify(data) }),
+    updateLanguage: (pid: string, id: string, data: Partial<LanguageSkill>) =>
+      apiFetch<LanguageSkill>(`/profiles/${pid}/languages/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteLanguage: (pid: string, id: string) => apiDelete(`/profiles/${pid}/languages/${id}`),
+
+    createCertification: (pid: string, data: Partial<Certification>) =>
+      apiFetch<Certification>(`/profiles/${pid}/certifications`, { method: "POST", body: JSON.stringify(data) }),
+    updateCertification: (pid: string, id: string, data: Partial<Certification>) =>
+      apiFetch<Certification>(`/profiles/${pid}/certifications/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteCertification: (pid: string, id: string) => apiDelete(`/profiles/${pid}/certifications/${id}`),
+
+    createAchievement: (pid: string, data: Partial<Achievement>) =>
+      apiFetch<Achievement>(`/profiles/${pid}/achievements`, { method: "POST", body: JSON.stringify(data) }),
+    updateAchievement: (pid: string, id: string, data: Partial<Achievement>) =>
+      apiFetch<Achievement>(`/profiles/${pid}/achievements/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteAchievement: (pid: string, id: string) => apiDelete(`/profiles/${pid}/achievements/${id}`),
   },
   jobs: {
     list: () => apiFetch<Job[]>("/jobs"),
@@ -129,12 +187,14 @@ export interface ProfileBlocks {
 
 export interface Experience {
   id: string;
-  employer: string;
-  role_title: string;
+  profile_id?: string;
+  employer?: string;
+  role_title?: string;
   start_date?: string;
   end_date?: string;
   location?: string;
   employment_type?: string;
+  description?: string;
   bullets: string[];
   tech_stack: string[];
   domain_tags: string[];
@@ -142,35 +202,44 @@ export interface Experience {
 
 export interface Project {
   id: string;
-  title: string;
+  profile_id?: string;
+  title?: string;
   role?: string;
   time_period?: string;
   description?: string;
+  bullets: string[];
   technologies: string[];
   outcomes: string[];
-  domain_tags: string[];
+  links: string[];
+  domain_tags?: string[];
 }
 
 export interface Skill {
   id: string;
+  profile_id?: string;
   name: string;
   category?: string;
   proficiency?: string;
+  years_of_experience?: number;
 }
 
 export interface LanguageSkill {
   id: string;
+  profile_id?: string;
   language: string;
-  level: string;
+  level?: string;
 }
 
 export interface Education {
   id: string;
-  institution: string;
+  profile_id?: string;
+  institution?: string;
   degree?: string;
   field_of_study?: string;
   start_date?: string;
   end_date?: string;
+  grade?: string;
+  achievements?: string[];
 }
 
 export interface Publication {
@@ -183,14 +252,21 @@ export interface Publication {
 
 export interface Certification {
   id: string;
-  name: string;
-  issuer: string;
+  profile_id?: string;
+  name?: string;
+  issuer?: string;
   issued_date?: string;
+  expiry_date?: string;
+  credential_id?: string;
+  credential_url?: string;
 }
 
 export interface Achievement {
   id: string;
-  statement: string;
+  profile_id?: string;
+  statement?: string;
+  context?: string;
+  metric_type?: string;
   metric_value?: string;
 }
 
@@ -266,6 +342,15 @@ export interface ClaimValidation {
   evidence_ids: string[];
   risk_level: string;
   reason?: string;
+}
+
+export interface BatchImportResult {
+  filename: string;
+  status: "ok" | "error";
+  document_type?: string;
+  evidence_id?: string;
+  extracted_entities?: Record<string, number>;
+  message?: string;
 }
 
 export interface ValidationReport {

@@ -1,11 +1,14 @@
 import logging
+import os
 from datetime import date
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 logger = logging.getLogger(__name__)
 
+_TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
+
 _jinja_env = Environment(
-    loader=FileSystemLoader("/app/templates"),
+    loader=FileSystemLoader(_TEMPLATES_DIR),
     autoescape=select_autoescape(["html"]),
 )
 

@@ -207,7 +207,7 @@ def _score_skills(skills: list[Skill], job: JobDescription) -> dict | None:
     must_have = {s.lower() for s in job.must_have_skills}
     nice = {s.lower() for s in job.nice_to_have_skills}
     skill_names = {s.name.lower() for s in skills}
-    synonyms = {syn.lower() for s in skills for syn in (s.synonyms or [])}
+    synonyms = {syn.lower() for s in skills for syn in (getattr(s, "synonyms", None) or [])}
     all_skill_terms = skill_names | synonyms
 
     must_match = must_have & all_skill_terms

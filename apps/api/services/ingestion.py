@@ -7,7 +7,7 @@ from models import (
     Education, Publication, Certification, Achievement, EvidenceItem,
 )
 from services.parsers.dispatcher import dispatch_parse
-from services.ai_client import structured_generation
+from services.ai_client import structured_generation, structured_generation_with_pdf
 from prompts.ingestion import INGESTION_SYSTEM, INGESTION_SCHEMA
 
 logger = logging.getLogger(__name__)
@@ -19,9 +19,17 @@ async def ingest_document(
     source_name: str,
     session: Session,
 ) -> dict:
-    raw_text = dispatch_parse(file_path)
-    if not raw_text.strip():
-        return {"status": "empty", "message": "No text could be extracted from document."}
+    ext = file_path.rsplit(".", 1)[-1].lower()
+    pdf_bytes: bytes | None = None
+
+    if ext == "pdf":
+        with open(file_path, "rb") as fh:
+            pdf_bytes = fh.read()
+        raw_text = f"[PDF nativ an Claude gesendet: {source_name}]"
+    else:
+        raw_text = dispatch_parse(file_path)
+        if not raw_text.strip():
+            return {"status": "empty", "message": "No text could be extracted from document."}
 
     evidence = EvidenceItem(
         profile_id=profile_id,
@@ -34,10 +42,11 @@ async def ingest_document(
     session.add(evidence)
     session.flush()
 
-    extracted = await structured_generation(
+    extracted = await structured_generation_with_pdf(
         system=INGESTION_SYSTEM,
-        user=f"Extract structured career data from this document:\n\n{raw_text}",
+        user="Extract structured career data from this document:",
         schema_description=INGESTION_SCHEMA,
+        pdf_bytes=pdf_bytes,
         max_tokens=8192,
     )
 

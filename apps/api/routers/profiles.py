@@ -1,8 +1,9 @@
+import logging
 import os
 import shutil
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlmodel import Session, select
 
@@ -19,6 +20,7 @@ from services.ingestion import ingest_document
 from config import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=ProfileRead, status_code=201)
@@ -96,6 +98,44 @@ async def import_document(
         session=session,
     )
     return result
+
+
+@router.post("/{profile_id}/import-batch")
+async def import_documents_batch(
+    profile_id: str,
+    files: List[UploadFile] = File(...),
+    session: Session = Depends(get_session),
+):
+    profile = session.get(CandidateProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    upload_dir = os.path.join(settings.upload_dir, profile_id)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    results = []
+    for file in files:
+        file_id = str(uuid.uuid4())
+        ext = os.path.splitext(file.filename or "")[1].lower()
+        dest_path = os.path.join(upload_dir, f"{file_id}{ext}")
+
+        with open(dest_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        try:
+            result = await ingest_document(
+                profile_id=profile_id,
+                file_path=dest_path,
+                source_name=file.filename or "upload",
+                session=session,
+            )
+            results.append({"filename": file.filename, **result})
+        except Exception as exc:
+            logger.error("Batch ingest failed for %s: %s", file.filename, exc)
+            session.rollback()
+            results.append({"filename": file.filename, "status": "error", "message": str(exc)})
+
+    return {"results": results}
 
 
 @router.post("/{profile_id}/freetext")
