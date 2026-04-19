@@ -30,6 +30,14 @@ export const api = {
         (r) => r.json()
       );
     },
+    addFreetext: (id: string, text: string, label: string) => {
+      const form = new FormData();
+      form.append("text", text);
+      form.append("label", label);
+      return fetch(`${API_BASE}/profiles/${id}/freetext`, { method: "POST", body: form }).then(
+        (r) => r.json()
+      );
+    },
   },
   jobs: {
     list: () => apiFetch<Job[]>("/jobs"),
@@ -140,6 +148,7 @@ export interface Project {
   description?: string;
   technologies: string[];
   outcomes: string[];
+  domain_tags: string[];
 }
 
 export interface Skill {

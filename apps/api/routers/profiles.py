@@ -98,6 +98,27 @@ async def import_document(
     return result
 
 
+@router.post("/{profile_id}/freetext")
+async def add_freetext_block(
+    profile_id: str,
+    text: str = Form(...),
+    label: str = Form(default="Manual Entry"),
+    session: Session = Depends(get_session),
+):
+    """Accept raw freetext from the user and run it through the ingestion pipeline."""
+    from services.ingestion import ingest_freetext
+    profile = session.get(CandidateProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    result = await ingest_freetext(
+        profile_id=profile_id,
+        text=text,
+        source_name=label,
+        session=session,
+    )
+    return result
+
+
 @router.get("/{profile_id}/blocks", response_model=ProfileBlocksRead)
 def get_profile_blocks(profile_id: str, session: Session = Depends(get_session)):
     profile = session.get(CandidateProfile, profile_id)
