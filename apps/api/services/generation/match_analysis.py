@@ -53,6 +53,7 @@ async def generate_match_analysis(payload: GenerationRequest, session: Session) 
     run = GenerationRun(
         profile_id=payload.profile_id,
         job_description_id=payload.job_id,
+        application_id=payload.application_id,
         run_type="match_analysis",
         selected_evidence_ids=payload.selected_evidence_ids,
         generation_inputs={"profile_id": payload.profile_id, "job_id": payload.job_id},

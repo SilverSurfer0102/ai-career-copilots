@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import re
 from anthropic import AsyncAnthropic
 from config import settings
 
@@ -16,7 +17,7 @@ def get_client() -> AsyncAnthropic:
 
 
 def _fix_json_strings(raw: str) -> str:
-    """Escape literal control characters inside JSON string values."""
+    """Escape literal control characters AND fix common structural issues."""
     result = []
     in_string = False
     escape_next = False
@@ -43,7 +44,60 @@ def _fix_json_strings(raw: str) -> str:
             result.append("\\t")
             continue
         result.append(ch)
-    return "".join(result)
+    fixed = "".join(result)
+    # Remove trailing commas before } or ]
+    fixed = re.sub(r",(\s*[}\]])", r"\1", fixed)
+    return fixed
+
+
+def _extract_json(raw: str) -> dict:
+    """Try to parse JSON from raw text, with progressive recovery attempts."""
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    fixed = _fix_json_strings(raw)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse JSON from model: %s\nRaw (first 500): %s", e, raw[:500])
+        raise ValueError(f"Model returned invalid JSON: {e}") from e
+
+
+def _unwrap_json_strings(obj):
+    """Recursively parse any string values that are valid JSON arrays/objects.
+
+    Tool-Use sometimes encodes nested structures as JSON strings when the
+    input_schema doesn't declare explicit types for those fields.
+    """
+    if isinstance(obj, dict):
+        return {k: _unwrap_json_strings(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_unwrap_json_strings(i) for i in obj]
+    if isinstance(obj, str):
+        stripped = obj.strip()
+        if stripped.startswith(("[", "{")):
+            try:
+                return _unwrap_json_strings(json.loads(stripped))
+            except json.JSONDecodeError:
+                pass
+    return obj
+
+
+def _make_tool(schema_description: str) -> dict:
+    return {
+        "name": "return_structured_data",
+        "description": (
+            "Return the structured result as required. "
+            f"Match this exact schema:\n{schema_description}"
+        ),
+        "input_schema": {
+            "type": "object",
+            "additionalProperties": True,
+        },
+    }
 
 
 async def structured_generation(
@@ -52,34 +106,31 @@ async def structured_generation(
     schema_description: str,
     max_tokens: int = 8192,
 ) -> dict:
-    """Call Claude and expect a JSON response. Returns parsed dict."""
+    """Call Claude via Tool-Use to guarantee valid JSON output."""
     client = get_client()
+    tool = _make_tool(schema_description)
     full_user = (
         f"{user}\n\n"
-        f"Respond with ONLY valid JSON matching this schema:\n{schema_description}\n"
-        f"IMPORTANT: Within JSON string values use \\n for newlines — never literal newline characters.\n"
-        f"No markdown, no explanation, just the JSON object."
+        f"Call return_structured_data with a result matching this schema exactly:\n"
+        f"{schema_description}"
     )
     message = await client.messages.create(
         model=settings.anthropic_model,
         max_tokens=max_tokens,
         system=system,
+        tools=[tool],
+        tool_choice={"type": "tool", "name": "return_structured_data"},
         messages=[{"role": "user", "content": full_user}],
     )
     if message.stop_reason == "max_tokens":
         logger.warning("Response truncated (max_tokens=%d) — output may be incomplete", max_tokens)
-    raw = message.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        fixed = _fix_json_strings(raw)
-        try:
-            return json.loads(fixed)
-        except json.JSONDecodeError as e:
-            logger.error("Failed to parse JSON from model: %s\nRaw: %s", e, raw[:500])
-            raise ValueError(f"Model returned invalid JSON: {e}") from e
+    for block in message.content:
+        if hasattr(block, "type") and block.type == "tool_use" and block.name == "return_structured_data":
+            return _unwrap_json_strings(block.input)
+    # Fallback: tool_choice was forced so this branch should never run
+    raw = message.content[0].text.strip() if message.content else "{}"
+    logger.warning("Tool-use fallback triggered — parsing text response")
+    return _extract_json(raw)
 
 
 async def structured_generation_with_pdf(
@@ -90,9 +141,10 @@ async def structured_generation_with_pdf(
     max_tokens: int = 8192,
 ) -> dict:
     client = get_client()
+    tool = _make_tool(schema_description)
     schema_instruction = (
-        f"\n\nRespond with ONLY valid JSON matching this schema:\n{schema_description}\n"
-        f"No markdown, no explanation, just the JSON object."
+        f"\n\nCall return_structured_data with a result matching this schema:\n"
+        f"{schema_description}"
     )
     if pdf_bytes:
         content = [
@@ -112,16 +164,16 @@ async def structured_generation_with_pdf(
         model=settings.anthropic_model,
         max_tokens=max_tokens,
         system=system,
+        tools=[tool],
+        tool_choice={"type": "tool", "name": "return_structured_data"},
         messages=[{"role": "user", "content": content}],
     )
-    raw = message.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error("Failed to parse JSON from model: %s\nRaw: %s", e, raw[:500])
-        raise ValueError(f"Model returned invalid JSON: {e}") from e
+    for block in message.content:
+        if hasattr(block, "type") and block.type == "tool_use" and block.name == "return_structured_data":
+            return _unwrap_json_strings(block.input)
+    raw = message.content[0].text.strip() if message.content else "{}"
+    logger.warning("Tool-use fallback triggered for PDF call — parsing text response")
+    return _extract_json(raw)
 
 
 async def free_generation(
@@ -130,7 +182,6 @@ async def free_generation(
     max_tokens: int = 4096,
 ) -> str:
     """Call Claude and return raw text response."""
-    client = get_client()
     message = await get_client().messages.create(
         model=settings.anthropic_model,
         max_tokens=max_tokens,

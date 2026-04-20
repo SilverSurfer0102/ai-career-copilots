@@ -1,0 +1,77 @@
+%% Academic CV Template — AI Career Copilot
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman,english]{babel}
+\usepackage[top=20mm,bottom=20mm,left=22mm,right=22mm]{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{xcolor}
+
+\definecolor{darkgray}{HTML}{374151}
+
+\hypersetup{colorlinks=true,urlcolor=darkgray,linkcolor=darkgray}
+
+\titleformat{\section}{\normalsize\bfseries\scshape\color{darkgray}}{}{0em}{}[\vspace{-4pt}\rule{\linewidth}{0.3pt}\vspace{2pt}]
+\titlespacing{\section}{0pt}{14pt}{6pt}
+
+\setlist[itemize]{leftmargin=1.4em,topsep=2pt,itemsep=1pt,parsep=0pt}
+\pagestyle{empty}
+
+\begin{document}
+
+%% ── Header ──────────────────────────────────────────────────────────────────
+\begin{center}
+  {\huge\bfseries\scshape << candidate_name | latex >>}\\[4pt]
+  <% if target_role %>
+  {\normalsize\itshape << target_role | latex >>}\\[3pt]
+  <% endif %>
+\end{center}
+
+<% if professional_summary %>
+\section{Research Profile}
+\noindent << professional_summary | latex >>
+<% endif %>
+
+%% ── Sections (Publications first if present) ────────────────────────────────
+<% set pub_sections = sections | selectattr('section_type', 'equalto', 'publications') | list %>
+<% set other_sections = sections | rejectattr('section_type', 'equalto', 'publications') | list %>
+<% set ordered = pub_sections + other_sections %>
+<% for section in ordered %>
+\section{<< section.get('title', '') | latex >>}
+
+<% for item in section.get('items', []) %>
+<% if section.get('section_type') == 'publications' %>
+\noindent << item.get('title', '') | latex >>
+<% if item.get('subtitle') %>, \textit{<< item.get('subtitle') | latex >>}<% endif %>
+<% if item.get('date_range') %>, << item.get('date_range') | latex >><% endif %>.\\[2pt]
+<% else %>
+\noindent\begin{tabularx}{\linewidth}{@{}X@{\hspace{6pt}}r@{}}
+  {\bfseries << item.get('title', '') | latex >>}
+  <% if item.get('subtitle') %> \newline {\itshape << item.get('subtitle') | latex >>} <% endif %>
+  <% if item.get('location') %> \newline {\small << item.get('location') | latex >>} <% endif %>
+  &
+  {\small\color{darkgray} << item.get('date_range', '') | latex >>}
+\end{tabularx}
+<% if item.get('bullets') %>
+\begin{itemize}
+<% for b in item.get('bullets', []) %>
+  \item << (b.get('text', b) if b is mapping else b) | latex >>
+<% endfor %>
+\end{itemize}
+<% endif %>
+<% if item.get('item_type') == 'skill_group' and item.get('metadata') %>
+<% for group, skills in item.get('metadata', {}).items() %>
+\noindent{\small\bfseries << group | latex >>:} << (skills | join(', ')) | latex >>\\
+<% endfor %>
+<% endif %>
+\vspace{4pt}
+<% endif %>
+<% endfor %>
+<% endfor %>
+
+\end{document}

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import {
@@ -600,6 +600,7 @@ function CollapsibleSection({ title, count, defaultOpen = false, children }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [blocks, setBlocks] = useState<ProfileBlocks | null>(null);
   type FileStatus = { name: string; status: "queued" | "processing" | "done" | "error"; message?: string };
@@ -610,6 +611,19 @@ export default function ProfilePage() {
   const [profileId, setProfileId] = useState("");
   const [freetextValue, setFreetextValue] = useState("");
   const [freetextLabel, setFreetextLabel] = useState("Manuelle Eingabe");
+
+  useEffect(() => {
+    api.profiles.list().then(async (profiles) => {
+      setAllProfiles(profiles);
+      if (profiles.length > 0) {
+        const first = profiles[0];
+        setProfile(first);
+        setProfileId(first.id);
+        const b = await api.profiles.blocks(first.id);
+        setBlocks(b);
+      }
+    });
+  }, []);
 
   const { register, handleSubmit } = useForm<{
     display_name: string; email: string; phone: string;
@@ -685,9 +699,73 @@ export default function ProfilePage() {
     finally { setSubmittingText(false); }
   };
 
+  const switchProfile = async (id: string) => {
+    const p = await api.profiles.get(id);
+    const b = await api.profiles.blocks(id);
+    setProfile(p);
+    setProfileId(id);
+    setBlocks(b);
+  };
+
+  const deleteProfile = async (id: string) => {
+    if (!confirm("Profil wirklich löschen? Alle Daten gehen verloren.")) return;
+    await api.profiles.delete(id);
+    const updated = allProfiles.filter((p) => p.id !== id);
+    setAllProfiles(updated);
+    if (profile?.id === id) {
+      setProfile(null);
+      setBlocks(null);
+      setProfileId("");
+      if (updated.length > 0) switchProfile(updated[0].id);
+    }
+    toast.success("Profil gelöscht");
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Profil</h1>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-serif font-semibold">Profil</h1>
+        {allProfiles.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Aktives Profil:</span>
+            <select
+              value={profile?.id || ""}
+              onChange={(e) => switchProfile(e.target.value)}
+              className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm"
+            >
+              {allProfiles.map((p) => (
+                <option key={p.id} value={p.id}>{p.display_name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {allProfiles.length > 1 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm flex items-start gap-3">
+          <span className="text-amber-800">
+            <strong>Du hast {allProfiles.length} Profile.</strong> Wähle oben das richtige aus oder lösche ein Duplikat.
+          </span>
+          <div className="ml-auto flex gap-2 flex-wrap">
+            {allProfiles.map((p) => (
+              <div key={p.id} className="flex items-center gap-1 bg-white border rounded px-2 py-1 text-xs">
+                <span className={p.id === profile?.id ? "font-bold text-primary" : "text-muted-foreground"}>
+                  {p.display_name}
+                </span>
+                {p.id !== profile?.id && (
+                  <button
+                    onClick={() => deleteProfile(p.id)}
+                    className="text-red-400 hover:text-red-600 ml-1 font-bold"
+                    title="Profil löschen"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!profile && (
         <Card>
@@ -716,20 +794,8 @@ export default function ProfilePage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader><CardTitle>Bestehendes Profil laden</CardTitle></CardHeader>
-        <CardContent className="flex gap-2">
-          <Input placeholder="Profil-ID" value={profileId} onChange={(e) => setProfileId(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onLoad()} />
-          <Button variant="outline" onClick={onLoad}>Laden</Button>
-        </CardContent>
-      </Card>
-
       {profile && (
         <>
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm flex items-center justify-between">
-            <span><strong>Profil-ID:</strong> <code className="font-mono">{profile.id}</code></span>
-            <span className="text-gray-500 text-xs">für den Workspace speichern</span>
-          </div>
 
           {blocks && <ProfileProgress blocks={blocks} />}
 

@@ -1,98 +1,147 @@
 <!DOCTYPE html>
-<html lang="{{ lang | default('en') }}">
+<html lang="{{ lang }}">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ candidate_name }} — Resume</title>
+<title>{{ candidate_name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
   body {
-    font-family: 'Arial', 'Helvetica Neue', sans-serif;
-    font-size: 11pt;
-    line-height: 1.45;
+    font-family: 'Roboto', Arial, sans-serif;
+    font-size: 10pt;
     color: #1a1a1a;
-    max-width: 800px;
+    background: #fff;
+    padding: 1.8cm 1.8cm 2cm;
+    max-width: 21cm;
     margin: 0 auto;
-    padding: 36px 40px;
-    background: #ffffff;
   }
-  h1 { font-size: 22pt; font-weight: 700; letter-spacing: -0.5px; color: #111; }
-  .contact { font-size: 10pt; color: #444; margin-top: 4px; }
-  .contact a { color: #444; text-decoration: none; }
-  .target-role { font-size: 12pt; color: #555; margin-top: 2px; font-style: italic; }
-  hr { border: none; border-top: 2px solid #1a1a1a; margin: 12px 0 8px 0; }
-  h2 {
-    font-size: 12pt;
+
+  .header {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .header h1 {
+    font-size: 22pt;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    margin-bottom: 5px;
+  }
+  .contact-line {
+    font-size: 9pt;
+    color: #333;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0 6px;
+    align-items: center;
+  }
+  .contact-line a { color: #1a1a1a; text-decoration: none; }
+  .sep { color: #888; padding: 0 2px; }
+
+  section { margin-top: 10px; }
+  section h2 {
+    font-size: 11.5pt;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    border-bottom: 1px solid #ccc;
+    letter-spacing: 0.06em;
+    border-bottom: 1.5px solid #1a1a1a;
     padding-bottom: 2px;
-    margin-top: 16px;
-    margin-bottom: 8px;
-    color: #111;
+    margin-bottom: 6px;
   }
-  .item { margin-bottom: 10px; }
-  .item-header { display: flex; justify-content: space-between; align-items: baseline; }
-  .item-title { font-weight: 700; font-size: 11pt; }
-  .item-subtitle { font-style: italic; color: #444; font-size: 10.5pt; }
-  .item-date { font-size: 10pt; color: #666; white-space: nowrap; }
-  .item-location { font-size: 10pt; color: #666; }
-  ul { margin-top: 4px; margin-left: 16px; }
-  li { margin-bottom: 2px; font-size: 10.5pt; }
-  .summary { margin-top: 8px; font-size: 11pt; color: #222; }
-  .skills-list { font-size: 10.5pt; }
-  .page-break { page-break-before: always; }
+
+  .summary p {
+    font-size: 9.5pt;
+    line-height: 1.45;
+  }
+
+  .entry { margin-bottom: 7px; }
+  .entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .entry-title  { font-weight: 700; font-size: 10pt; }
+  .entry-date   { font-size: 9pt; color: #333; white-space: nowrap; }
+  .entry-subrow { margin-top: 1px; margin-bottom: 2px; }
+  .entry-subtitle { font-style: italic; font-size: 9pt; color: #444; }
+
+  ul.bullets {
+    margin-top: 3px;
+    padding-left: 16px;
+    list-style-type: disc;
+  }
+  ul.bullets li {
+    font-size: 9.5pt;
+    line-height: 1.4;
+    margin-bottom: 2px;
+  }
+
+  .flat-list { font-size: 9.5pt; line-height: 1.6; }
+  .flat-item { margin-bottom: 2px; }
+
+  @media print {
+    body { padding: 1.2cm; }
+    a { color: #1a1a1a !important; text-decoration: none !important; }
+  }
 </style>
 </head>
 <body>
 
-<h1>{{ candidate_name }}</h1>
-{% if target_role %}
-<div class="target-role">{{ target_role }}</div>
-{% endif %}
-{% if contact %}
-<div class="contact">{{ contact }}</div>
-{% endif %}
+<div class="header">
+  <h1>{{ candidate_name }}</h1>
+  <div class="contact-line">
+    {%- set ns = namespace(first=true) -%}
+    {%- macro sep() %}{%- if not ns.first %}<span class="sep">|</span>{%- endif %}{%- set ns.first = false -%}{%- endmacro -%}
+    {%- if phone %}{{ sep() }}<span>{{ phone }}</span>{% set ns.first = false %}{% endif -%}
+    {%- if email %}{{ sep() }}<a href="mailto:{{ email }}">{{ email }}</a>{% set ns.first = false %}{% endif -%}
+    {%- if linkedin %}{{ sep() }}<a href="{{ linkedin }}">{{ linkedin | replace('https://','') | replace('http://','') }}</a>{% set ns.first = false %}{% endif -%}
+    {%- if github %}{{ sep() }}<a href="{{ github }}">{{ github | replace('https://','') | replace('http://','') }}</a>{% set ns.first = false %}{% endif -%}
+    {%- if website and website != linkedin and website != github %}{{ sep() }}<a href="{{ website }}">{{ website | replace('https://','') | replace('http://','') }}</a>{% endif -%}
+  </div>
+</div>
 
 {% if professional_summary %}
-<h2>Professional Summary</h2>
-<div class="summary">{{ professional_summary }}</div>
+<section class="summary">
+  <h2>{% if lang == 'de' %}Zusammenfassung{% elif lang == 'fr' %}Résumé professionnel{% else %}Summary{% endif %}</h2>
+  <p>{{ professional_summary }}</p>
+</section>
 {% endif %}
 
 {% for section in sections %}
-<h2>{{ section.title }}</h2>
-
-{% for item in section['items'] %}
-<div class="item">
-  <div class="item-header">
-    <div>
-      <span class="item-title">{{ item.title }}</span>
-      {% if item.subtitle %}
-        &nbsp;—&nbsp;<span class="item-subtitle">{{ item.subtitle }}</span>
-      {% endif %}
+<section>
+  <h2>{{ section.title }}</h2>
+  {% set items = section['items'] if 'items' in section else [] %}
+  {% for item in items %}
+  <div class="entry">
+    <div class="entry-header">
+      <span class="entry-title">{{ item.title or '' }}</span>
+      <span class="entry-date">{{ item.date_range or '' }}</span>
     </div>
-    <div class="item-date">{{ item.date_range or '' }}</div>
+    {% if item.subtitle or item.location %}
+    <div class="entry-subrow">
+      <span class="entry-subtitle">
+        {{- item.subtitle or '' -}}
+        {%- if item.subtitle and item.location %} · {% endif -%}
+        {{- item.location or '' -}}
+      </span>
+    </div>
+    {% endif %}
+    {% if item.bullets %}
+    <ul class="bullets">
+      {% for b in item.bullets %}
+      {% set txt = b.text if b is mapping else b %}
+      {% if txt %}<li>{{ txt }}</li>{% endif %}
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if not item.bullets and item.description %}
+    <p style="font-size:9.5pt;margin-top:2px;">{{ item.description }}</p>
+    {% endif %}
   </div>
-  {% if item.location %}
-  <div class="item-location">{{ item.location }}</div>
-  {% endif %}
-  {% if item.bullets %}
-  <ul>
-    {% for bullet in item.bullets %}
-    <li>{{ bullet.text if bullet is mapping else bullet }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if item.item_type == 'skill_group' and item.metadata %}
-  <div class="skills-list">
-    {% for group, skills in item.metadata.items() %}
-    <strong>{{ group }}:</strong> {{ skills | join(', ') }}<br>
-    {% endfor %}
-  </div>
-  {% endif %}
-</div>
-{% endfor %}
+  {% endfor %}
+</section>
 {% endfor %}
 
 </body>

@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
+import copy
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import Session, select
 
 from database import get_session
 from models import CandidateProfile, JobDescription, GenerationRun
-from schemas.generation import GenerationRequest, GenerationRunRead
+from schemas.generation import GenerationRequest, GenerationRunRead, OutputPatch
 from services.generation.resume import generate_resume
 from services.generation.cover_letter import generate_cover_letter
 from services.generation.match_analysis import generate_match_analysis
@@ -38,12 +40,101 @@ async def run_match_analysis(
     return run
 
 
+@router.get("/runs", response_model=list[GenerationRunRead])
+def list_runs(
+    application_id: Optional[str] = Query(default=None),
+    run_type: Optional[str] = Query(default=None),
+    profile_id: Optional[str] = Query(default=None),
+    session: Session = Depends(get_session),
+):
+    q = select(GenerationRun).order_by(GenerationRun.created_at.desc())
+    if application_id:
+        q = q.where(GenerationRun.application_id == application_id)
+    if run_type:
+        q = q.where(GenerationRun.run_type == run_type)
+    if profile_id:
+        q = q.where(GenerationRun.profile_id == profile_id)
+    return session.exec(q).all()
+
+
 @router.get("/runs/{run_id}", response_model=GenerationRunRead)
 def get_run(run_id: str, session: Session = Depends(get_session)):
     run = session.get(GenerationRun, run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Generation run not found")
     return run
+
+
+@router.delete("/runs/{run_id}", status_code=204)
+def delete_run(run_id: str, session: Session = Depends(get_session)):
+    run = session.get(GenerationRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Generation run not found")
+    session.delete(run)
+    session.commit()
+
+
+@router.patch("/runs/{run_id}/outputs", response_model=GenerationRunRead)
+def patch_run_outputs(run_id: str, patch: OutputPatch, session: Session = Depends(get_session)):
+    """Apply a dot-path update to generation_outputs for inline editing."""
+    run = session.get(GenerationRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Generation run not found")
+    outputs = copy.deepcopy(dict(run.generation_outputs or {}))
+    if patch.op == "set":
+        _set_nested(outputs, patch.path, patch.value)
+    elif patch.op in ("append", "delete"):
+        _mutate_array(outputs, patch.path, patch.op, patch.value)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown op: {patch.op}")
+    run.generation_outputs = outputs
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    return run
+
+
+@router.post("/runs/{run_id}/compact", response_model=GenerationRunRead)
+async def compact_run(run_id: str, session: Session = Depends(get_session)):
+    """Compact a resume run to 1-page length via a second Claude pass."""
+    from services.generation.compact import compact_resume
+    run = session.get(GenerationRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Generation run not found")
+    if run.run_type not in ("resume", "resume_compact"):
+        raise HTTPException(status_code=400, detail="Only resume runs can be compacted")
+    compact_run_obj = await compact_resume(run, session)
+    return compact_run_obj
+
+
+def _mutate_array(obj: dict, path: str, op: str, value) -> None:
+    """Append to or delete from a nested list using dot-notation path."""
+    keys = path.split(".")
+    current = obj
+    for key in keys[:-1]:
+        current = current[int(key)] if isinstance(current, list) else current[key]
+    last = keys[-1]
+    target = current[int(last)] if isinstance(current, list) else current[last]
+    if op == "append":
+        target.append(value)
+    elif op == "delete":
+        del target[int(value)]
+
+
+def _set_nested(obj: dict, path: str, value) -> None:
+    """Set a value in a nested dict/list using dot-notation path (e.g. 'sections.0.items.0.bullets.1.text')."""
+    keys = path.split(".")
+    current = obj
+    for key in keys[:-1]:
+        if isinstance(current, list):
+            current = current[int(key)]
+        else:
+            current = current[key]
+    last = keys[-1]
+    if isinstance(current, list):
+        current[int(last)] = value
+    else:
+        current[last] = value
 
 
 def _validate_ids(payload: GenerationRequest, session: Session) -> None:

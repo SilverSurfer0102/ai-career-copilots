@@ -1,3 +1,5 @@
+import copy
+import json
 import logging
 import os
 from datetime import date
@@ -13,35 +15,68 @@ _jinja_env = Environment(
 )
 
 
-def render_resume_html(run) -> str:
+def _parse_json_field(val, fallback):
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except Exception:
+            return fallback
+    return val if val is not None else fallback
+
+
+def render_resume_html(run, profile=None) -> str:
     outputs = run.generation_outputs or {}
     template = _jinja_env.get_template("resume.html.j2")
 
-    summary = outputs.get("professional_summary", {})
-    summary_text = summary.get("text", "") if isinstance(summary, dict) else str(summary)
+    summary_raw = outputs.get("professional_summary", {})
+    summary_raw = _parse_json_field(summary_raw, {"text": ""})
+    summary_text = summary_raw.get("text", "") if isinstance(summary_raw, dict) else str(summary_raw)
+
+    sections = _parse_json_field(outputs.get("sections", []), [])
+
+    email = phone = linkedin = github = website = ""
+    if profile:
+        email = profile.email or ""
+        phone = profile.phone or ""
+        linkedin = profile.linkedin_url or ""
+        github = profile.github_url or ""
+        website = profile.website or ""
+
+    gen_inputs = run.generation_inputs or {}
+    lang = gen_inputs.get("options", {}).get("language_override") or "en"
 
     return template.render(
-        candidate_name=outputs.get("candidate_name", ""),
+        candidate_name=outputs.get("candidate_name", "") or (profile.display_name if profile else ""),
         target_role=outputs.get("target_role", ""),
-        contact="",
+        email=email,
+        phone=phone,
+        linkedin=linkedin,
+        github=github,
+        website=website,
         professional_summary=summary_text,
-        sections=outputs.get("sections", []),
-        lang="en",
+        sections=sections,
+        lang=lang,
     )
 
 
-def render_cover_letter_html(run) -> str:
+def render_cover_letter_html(run, profile=None) -> str:
     outputs = run.generation_outputs or {}
     template = _jinja_env.get_template("cover_letter.html.j2")
 
+    paragraphs = _parse_json_field(outputs.get("paragraphs", []), [])
+
+    candidate_name = ""
+    if profile:
+        candidate_name = profile.display_name or ""
+
     return template.render(
-        candidate_name="",
+        candidate_name=candidate_name,
         contact="",
         date=date.today().strftime("%B %d, %Y"),
         recipient_name=outputs.get("recipient_name"),
         company_name=outputs.get("company_name", ""),
         position_title=outputs.get("position_title", ""),
-        paragraphs=outputs.get("paragraphs", []),
+        paragraphs=paragraphs,
         closing_salutation=outputs.get("closing_salutation", "Sincerely"),
         lang="en",
     )

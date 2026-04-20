@@ -9,12 +9,14 @@ class GenerationRequest(BaseModel):
     job_id: str
     selected_evidence_ids: list[str] = []
     options: dict = {}  # e.g. {"language": "de", "tone": "formal"}
+    application_id: Optional[str] = None
 
 
 class GenerationRunRead(BaseModel):
     id: str
     profile_id: str
     job_description_id: str
+    application_id: Optional[str] = None
     run_type: str
     status: str
     selected_evidence_ids: list
@@ -28,3 +30,9 @@ class GenerationRunRead(BaseModel):
     completed_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class OutputPatch(BaseModel):
+    path: str  # dot-notation path e.g. "sections.0.items.0.bullets.1.text"
+    value: object = None
+    op: str = "set"  # "set" | "append" | "delete"

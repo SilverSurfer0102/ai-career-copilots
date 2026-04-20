@@ -58,6 +58,7 @@ async def generate_cover_letter(payload: GenerationRequest, session: Session) ->
     run = GenerationRun(
         profile_id=payload.profile_id,
         job_description_id=payload.job_id,
+        application_id=payload.application_id,
         run_type="cover_letter",
         selected_evidence_ids=evidence_ids,
         generation_inputs={"profile_id": payload.profile_id, "job_id": payload.job_id, "options": payload.options},

@@ -209,13 +209,30 @@ class JobDescription(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=_now)
 
 
+class Application(SQLModel, table=True):
+    __tablename__ = "application"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    profile_id: str = Field(foreign_key="candidate_profile.id")
+    job_id: str = Field(foreign_key="job_description.id")
+    status: str = "draft"  # draft|ready|submitted|interview|rejected|offer|archived
+    label: Optional[str] = None
+    notes: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
 class GenerationRun(SQLModel, table=True):
     __tablename__ = "generation_run"
 
     id: str = Field(default_factory=_uuid, primary_key=True)
     profile_id: str = Field(foreign_key="candidate_profile.id")
     job_description_id: str = Field(foreign_key="job_description.id")
-    run_type: str  # "resume" | "cover_letter" | "match_analysis"
+    application_id: Optional[str] = Field(default=None, foreign_key="application.id")
+    run_type: str  # "resume" | "cover_letter" | "match_analysis" | "resume_compact"
     status: str = "pending"  # "pending" | "running" | "done" | "failed"
     selected_evidence_ids: list = Field(default_factory=list, sa_column=Column(JSON))
     generation_inputs: dict = Field(default_factory=dict, sa_column=Column(JSON))

@@ -1,0 +1,68 @@
+%% Classic CV Template (DIN 5008) — AI Career Copilot
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+\usepackage[top=25mm,bottom=20mm,left=25mm,right=20mm]{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{parskip}
+
+\hypersetup{hidelinks}
+
+\titleformat{\section}{\normalsize\bfseries\uppercase}{}{0em}{}[\vspace{-2pt}\rule{\linewidth}{0.4pt}]
+\titlespacing{\section}{0pt}{12pt}{6pt}
+
+\setlist[itemize]{leftmargin=1.2em,topsep=2pt,itemsep=0pt,parsep=0pt}
+\pagestyle{empty}
+
+\begin{document}
+
+%% ── Header (DIN 5008) ────────────────────────────────────────────────────────
+\begin{center}
+  {\LARGE\bfseries\scshape << candidate_name | latex >>}\\[4pt]
+  <% if target_role %>
+  {\normalsize << target_role | latex >>}\\[2pt]
+  <% endif %>
+\end{center}
+\noindent\rule{\linewidth}{0.8pt}
+
+<% if professional_summary %>
+\section{Profil}
+\noindent << professional_summary | latex >>
+<% endif %>
+
+%% ── Sections ────────────────────────────────────────────────────────────────
+<% for section in sections %>
+\section{<< section.get('title', '') | latex >>}
+
+<% for item in section.get('items', []) %>
+\noindent\begin{tabularx}{\linewidth}{@{}p{28mm}@{\hspace{4mm}}X@{}}
+  \small << item.get('date_range', '') | latex >> &
+  \begin{minipage}[t]{\linewidth}
+    {\bfseries << item.get('title', '') | latex >>}
+    <% if item.get('subtitle') %>, {\itshape << item.get('subtitle') | latex >>}<% endif %>
+    <% if item.get('location') %>\\{\small << item.get('location') | latex >>}<% endif %>
+    <% if item.get('bullets') %>
+    \begin{itemize}
+    <% for b in item.get('bullets', []) %>
+      \item << (b.get('text', b) if b is mapping else b) | latex >>
+    <% endfor %>
+    \end{itemize}
+    <% endif %>
+    <% if item.get('item_type') == 'skill_group' and item.get('metadata') %>
+    <% for group, skills in item.get('metadata', {}).items() %>
+    {\small\bfseries << group | latex >>:} << (skills | join(', ')) | latex >>\\
+    <% endfor %>
+    <% endif %>
+  \end{minipage}\\[6pt]
+\end{tabularx}
+<% endfor %>
+<% endfor %>
+
+\end{document}

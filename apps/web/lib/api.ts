@@ -30,6 +30,7 @@ export const api = {
       apiFetch<Profile>("/profiles", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: Partial<ProfileCreate>) =>
       apiFetch<Profile>(`/profiles/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (id: string) => apiDelete(`/profiles/${id}`),
     blocks: (id: string) => apiFetch<ProfileBlocks>(`/profiles/${id}/blocks`),
     importFile: (id: string, file: File) => {
       const form = new FormData();
@@ -137,6 +138,35 @@ export const api = {
     coverLetterHtmlUrl: (run_id: string) => `${API_BASE}/export/runs/${run_id}/cover-letter/html`,
     resumePdfUrl: (run_id: string) => `${API_BASE}/export/runs/${run_id}/resume/pdf`,
     coverLetterPdfUrl: (run_id: string) => `${API_BASE}/export/runs/${run_id}/cover-letter/pdf`,
+    resumeLatexUrl: (run_id: string, template: string) =>
+      `${API_BASE}/export/runs/${run_id}/resume/latex?template=${template}`,
+  },
+  applications: {
+    list: () => apiFetch<Application[]>("/applications"),
+    get: (id: string) => apiFetch<ApplicationDetail>(`/applications/${id}`),
+    create: (data: ApplicationCreate) =>
+      apiFetch<Application>("/applications", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<ApplicationUpdate>) =>
+      apiFetch<Application>(`/applications/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (id: string) => apiDelete(`/applications/${id}`),
+  },
+  runs: {
+    list: (params: { application_id?: string; run_type?: string; profile_id?: string }) => {
+      const qs = new URLSearchParams();
+      if (params.application_id) qs.set("application_id", params.application_id);
+      if (params.run_type) qs.set("run_type", params.run_type);
+      if (params.profile_id) qs.set("profile_id", params.profile_id);
+      return apiFetch<GenerationRun[]>(`/generate/runs?${qs.toString()}`);
+    },
+    get: (id: string) => apiFetch<GenerationRun>(`/generate/runs/${id}`),
+    patchOutputs: (run_id: string, path: string, value: unknown, op?: string) =>
+      apiFetch<GenerationRun>(`/generate/runs/${run_id}/outputs`, {
+        method: "PATCH",
+        body: JSON.stringify({ path, value, op: op ?? "set" }),
+      }),
+    compact: (run_id: string) =>
+      apiFetch<GenerationRun>(`/generate/runs/${run_id}/compact`, { method: "POST" }),
+    delete: (run_id: string) => apiDelete(`/generate/runs/${run_id}`),
   },
 };
 
@@ -325,11 +355,13 @@ export interface GenerationRun {
   id: string;
   profile_id: string;
   job_description_id: string;
+  application_id?: string;
   run_type: string;
   status: string;
   selected_evidence_ids: string[];
   generation_inputs: Record<string, unknown>;
   generation_outputs: Record<string, unknown>;
+  intermediate_repr: Record<string, unknown>;
   validation_report: Record<string, unknown>;
   model_name?: string;
   created_at: string;
@@ -360,4 +392,53 @@ export interface ValidationReport {
   high_risk_count: number;
   claims: ClaimValidation[];
   summary: string;
+}
+
+export type ApplicationStatus =
+  | "draft"
+  | "ready"
+  | "submitted"
+  | "interview"
+  | "rejected"
+  | "offer"
+  | "archived";
+
+export interface Application {
+  id: string;
+  profile_id: string;
+  job_id: string;
+  status: ApplicationStatus;
+  label?: string;
+  notes?: string;
+  submitted_at?: string;
+  created_at: string;
+  updated_at: string;
+  profile_name?: string;
+  job_title?: string;
+  job_company?: string;
+}
+
+export interface ApplicationCreate {
+  profile_id: string;
+  job_id: string;
+  label?: string;
+}
+
+export interface ApplicationUpdate {
+  status?: ApplicationStatus;
+  label?: string;
+  notes?: string;
+  submitted_at?: string;
+}
+
+export interface RunSummary {
+  id: string;
+  run_type: string;
+  status: string;
+  created_at: string;
+  completed_at?: string;
+}
+
+export interface ApplicationDetail extends Application {
+  runs: RunSummary[];
 }

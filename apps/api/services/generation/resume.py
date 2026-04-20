@@ -3,6 +3,8 @@ import logging
 from datetime import datetime
 from sqlmodel import Session, select
 
+from collections import defaultdict
+
 from models import (
     CandidateProfile, JobDescription, GenerationRun,
     Experience, Project, Skill, LanguageSkill, Education,
@@ -41,13 +43,16 @@ async def generate_resume(payload: GenerationRequest, session: Session) -> Gener
         session=session,
     )
 
+    profile_blocks = _build_profile_blocks(payload.profile_id, session)
+
     user_prompt = (
         f"Generate a tailored resume for the following candidate applying to this role.\n\n"
         f"## Candidate Profile\n{_profile_summary(profile)}\n\n"
+        f"## Structured Profile Data (use these blocks DIRECTLY — do not omit any)\n{profile_blocks}\n\n"
         f"## Job Description\nTitle: {job.title}\nCompany: {job.company}\n"
         f"Must-have skills: {', '.join(job.must_have_skills)}\n"
         f"Responsibilities: {chr(10).join(job.responsibilities[:10])}\n\n"
-        f"## Selected Evidence\n{evidence_context}\n\n"
+        f"## Evidence for Experience Bullets\n{evidence_context}\n\n"
         f"Language: {payload.options.get('language_override') or job.output_language or 'en'}"
     )
 
@@ -61,6 +66,7 @@ async def generate_resume(payload: GenerationRequest, session: Session) -> Gener
     run = GenerationRun(
         profile_id=payload.profile_id,
         job_description_id=payload.job_id,
+        application_id=payload.application_id,
         run_type="resume",
         selected_evidence_ids=evidence_ids,
         generation_inputs={"profile_id": payload.profile_id, "job_id": payload.job_id, "options": payload.options},
@@ -86,6 +92,44 @@ def _profile_summary(profile: CandidateProfile) -> str:
     if profile.target_roles:
         lines.append(f"Target roles: {', '.join(str(r) for r in profile.target_roles)}")
     return "\n".join(lines)
+
+
+def _build_profile_blocks(profile_id: str, session: Session) -> str:
+    """Return all structured profile blocks as a formatted string for the prompt.
+
+    These are authoritative — Claude must include them in full, not filter by relevance.
+    """
+    blocks = []
+
+    languages = session.exec(
+        select(LanguageSkill).where(LanguageSkill.profile_id == profile_id)
+    ).all()
+    if languages:
+        lang_lines = [f"  - {l.language}" + (f" ({l.level})" if l.level else "") for l in languages]
+        blocks.append("LANGUAGES (include ALL in Languages section):\n" + "\n".join(lang_lines))
+
+    skills = session.exec(
+        select(Skill).where(Skill.profile_id == profile_id)
+    ).all()
+    if skills:
+        by_cat: dict = defaultdict(list)
+        for s in skills:
+            by_cat[s.category or "Other"].append(s.name)
+        skill_lines = [f"  {cat}: {', '.join(names)}" for cat, names in by_cat.items()]
+        blocks.append("SKILLS (include ALL in Skills section):\n" + "\n".join(skill_lines))
+
+    certs = session.exec(
+        select(Certification).where(Certification.profile_id == profile_id)
+    ).all()
+    if certs:
+        cert_lines = [
+            f"  - {c.name}" + (f" ({c.issuer}, {c.issued_date})" if c.issuer else "")
+            for c in certs if c.name
+        ]
+        if cert_lines:
+            blocks.append("CERTIFICATIONS (include ALL in Certifications section):\n" + "\n".join(cert_lines))
+
+    return "\n\n".join(blocks) if blocks else "No structured blocks available."
 
 
 def _build_evidence_context(

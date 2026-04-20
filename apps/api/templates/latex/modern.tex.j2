@@ -1,0 +1,71 @@
+%% Modern CV Template — AI Career Copilot
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman,english]{babel}
+\usepackage[top=18mm,bottom=18mm,left=20mm,right=20mm]{geometry}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{parskip}
+
+\definecolor{accent}{HTML}{2563EB}
+\definecolor{subtle}{HTML}{6B7280}
+
+\hypersetup{colorlinks=true,urlcolor=accent,linkcolor=accent}
+
+\titleformat{\section}{\large\bfseries\color{accent}}{}{0em}{}[\color{accent}\titlerule]
+\titlespacing{\section}{0pt}{10pt}{6pt}
+
+\setlist[itemize]{leftmargin=1.4em,topsep=2pt,itemsep=1pt,parsep=0pt}
+\renewcommand{\labelitemi}{\textcolor{accent}{\textbullet}}
+\pagestyle{empty}
+
+\begin{document}
+
+%% ── Header ──────────────────────────────────────────────────────────────────
+{\Huge\bfseries << candidate_name | latex >>}\\[2pt]
+<% if target_role %>
+{\large\color{subtle} << target_role | latex >>}\\[2pt]
+<% endif %>
+\noindent\textcolor{accent}{\rule{\linewidth}{1.5pt}}
+
+<% if professional_summary %>
+\section{Profil}
+<< professional_summary | latex >>
+<% endif %>
+
+%% ── Sections ────────────────────────────────────────────────────────────────
+<% for section in sections %>
+\section{<< section.get('title', '') | latex >>}
+
+<% for item in section.get('items', []) %>
+\noindent
+\begin{tabularx}{\linewidth}{@{}X@{\hspace{6pt}}r@{}}
+  {\bfseries << item.get('title', '') | latex >>}
+  <% if item.get('subtitle') %> \newline {\itshape\color{subtle} << item.get('subtitle') | latex >>} <% endif %>
+  <% if item.get('location') %> \newline {\small\color{subtle} << item.get('location') | latex >>} <% endif %>
+  &
+  {\small\color{subtle} << item.get('date_range', '') | latex >>}
+\end{tabularx}
+
+<% if item.get('bullets') %>
+\begin{itemize}
+<% for b in item.get('bullets', []) %>
+  \item << (b.get('text', b) if b is mapping else b) | latex >>
+<% endfor %>
+\end{itemize}
+<% endif %>
+<% if item.get('item_type') == 'skill_group' and item.get('metadata') %>
+<% for group, skills in item.get('metadata', {}).items() %>
+\noindent{\bfseries\small << group | latex >>:} << (skills | join(', ')) | latex >>\\
+<% endfor %>
+<% endif %>
+\vspace{4pt}
+<% endfor %>
+<% endfor %>
+
+\end{document}
