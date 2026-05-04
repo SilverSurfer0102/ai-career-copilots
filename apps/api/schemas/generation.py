@@ -10,12 +10,18 @@ class GenerationRequest(BaseModel):
     selected_evidence_ids: list[str] = []
     options: dict = {}  # e.g. {"language": "de", "tone": "formal"}
     application_id: Optional[str] = None
+    pool_run_id: Optional[str] = None
+
+
+class PoolResumeRequest(BaseModel):
+    profile_id: str
+    options: dict = {}
 
 
 class GenerationRunRead(BaseModel):
     id: str
     profile_id: str
-    job_description_id: str
+    job_description_id: Optional[str] = None
     application_id: Optional[str] = None
     run_type: str
     status: str

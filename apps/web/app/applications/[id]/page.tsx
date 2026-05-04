@@ -53,6 +53,8 @@ export default function ApplicationDetailPage() {
   const [notes, setNotes] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
   const [language, setLanguage] = useState("auto");
+  const [poolRunId, setPoolRunId] = useState<string | null>(null);
+  const [usePool, setUsePool] = useState(false);
 
   const loadRuns = useCallback(async () => {
     const runs = await api.runs.list({ application_id: id });
@@ -71,9 +73,11 @@ export default function ApplicationDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    api.applications.get(id).then((a) => {
+    api.applications.get(id).then(async (a) => {
       setApp(a);
       setNotes(a.notes || "");
+      const poolRuns = await api.runs.list({ profile_id: a.profile_id, run_type: "resume_pool" });
+      if (poolRuns.length > 0) setPoolRunId(poolRuns[0].id);
     }).catch(() => toast.error("Bewerbung nicht gefunden"));
     loadRuns();
   }, [id, loadRuns]);
@@ -100,6 +104,7 @@ export default function ApplicationDetailPage() {
         job_id: app.job_id,
         application_id: id,
         options: language !== "auto" ? { language_override: language } : {},
+        pool_run_id: (type === "resume" && usePool && poolRunId) ? poolRunId : undefined,
       };
       if (type === "resume") {
         const run = await api.generate.resume(req);
@@ -235,9 +240,23 @@ export default function ApplicationDetailPage() {
 
       {/* Generation actions */}
       <div className="flex flex-wrap gap-3 items-center">
-        <Button onClick={() => generate("resume")} disabled={!!generating}>
-          {generating === "resume" ? "Generiere CV…" : "CV generieren"}
-        </Button>
+        <div className="flex flex-col gap-1">
+          {poolRunId && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={usePool}
+                onChange={(e) => setUsePool(e.target.checked)}
+                className="rounded"
+              />
+              Aus Pool-CV ableiten
+              <span className="text-primary/70">(empfohlen)</span>
+            </label>
+          )}
+          <Button onClick={() => generate("resume")} disabled={!!generating}>
+            {generating === "resume" ? "Generiere CV…" : "CV generieren"}
+          </Button>
+        </div>
         <Button variant="outline" onClick={() => generate("cover-letter")} disabled={!!generating}>
           {generating === "cover-letter" ? "Generiere…" : "Anschreiben"}
         </Button>

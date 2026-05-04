@@ -121,6 +121,13 @@ async def build_evidence_pack(
                 reasons=[f"Language match: {', '.join(l.language for l in matched)}"],
             ))
 
+    # Apply trust_level weighting from evidence items
+    evidence_trust = _build_evidence_trust_map(profile_id, session)
+    for entry in entries:
+        if entry.evidence_ids:
+            max_trust = max((evidence_trust.get(eid, 1.0) for eid in entry.evidence_ids), default=1.0)
+            entry.relevance_score = entry.relevance_score * max_trust
+
     # Apply manual overrides
     if overrides:
         entries = _apply_overrides(entries, overrides)
@@ -136,6 +143,13 @@ async def build_evidence_pack(
         total_score=total,
         retrieval_method="keyword",
     )
+
+
+def _build_evidence_trust_map(profile_id: str, session: Session) -> dict[str, float]:
+    items = session.exec(
+        select(EvidenceItem.id, EvidenceItem.trust_level).where(EvidenceItem.profile_id == profile_id)
+    ).all()
+    return {item.id: item.trust_level for item in items}
 
 
 def _build_keyword_set(job: JobDescription) -> set[str]:

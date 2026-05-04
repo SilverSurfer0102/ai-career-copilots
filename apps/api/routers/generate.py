@@ -5,12 +5,30 @@ from sqlmodel import Session, select
 
 from database import get_session
 from models import CandidateProfile, JobDescription, GenerationRun
-from schemas.generation import GenerationRequest, GenerationRunRead, OutputPatch
+from schemas.generation import GenerationRequest, GenerationRunRead, OutputPatch, PoolResumeRequest
 from services.generation.resume import generate_resume
 from services.generation.cover_letter import generate_cover_letter
 from services.generation.match_analysis import generate_match_analysis
+from services.generation.pool_resume import generate_pool_resume
+from services.feedback import get_feedback_context, log_edit
 
 router = APIRouter()
+
+
+@router.post("/pool-resume", response_model=GenerationRunRead)
+async def run_pool_resume_generation(
+    payload: PoolResumeRequest, session: Session = Depends(get_session)
+):
+    if not session.get(CandidateProfile, payload.profile_id):
+        raise HTTPException(status_code=404, detail="Profile not found")
+    feedback_ctx = get_feedback_context(payload.profile_id, session)
+    run = await generate_pool_resume(
+        profile_id=payload.profile_id,
+        options=payload.options,
+        feedback_context=feedback_ctx,
+        session=session,
+    )
+    return run
 
 
 @router.post("/resume", response_model=GenerationRunRead)
@@ -18,7 +36,8 @@ async def run_resume_generation(
     payload: GenerationRequest, session: Session = Depends(get_session)
 ):
     _validate_ids(payload, session)
-    run = await generate_resume(payload, session)
+    feedback_ctx = get_feedback_context(payload.profile_id, session)
+    run = await generate_resume(payload, session, feedback_context=feedback_ctx)
     return run
 
 
@@ -81,16 +100,35 @@ def patch_run_outputs(run_id: str, patch: OutputPatch, session: Session = Depend
     if not run:
         raise HTTPException(status_code=404, detail="Generation run not found")
     outputs = copy.deepcopy(dict(run.generation_outputs or {}))
+
+    original_value = None
     if patch.op == "set":
+        try:
+            original_value = _get_nested(outputs, patch.path)
+        except (KeyError, IndexError, TypeError):
+            original_value = None
         _set_nested(outputs, patch.path, patch.value)
     elif patch.op in ("append", "delete"):
         _mutate_array(outputs, patch.path, patch.op, patch.value)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown op: {patch.op}")
+
     run.generation_outputs = outputs
     session.add(run)
     session.commit()
     session.refresh(run)
+
+    if patch.op == "set" and original_value is not None and patch.value is not None:
+        log_edit(
+            run_id=run_id,
+            profile_id=run.profile_id,
+            run_type=run.run_type,
+            field_path=patch.path,
+            original_value=str(original_value),
+            edited_value=str(patch.value),
+            session=session,
+        )
+
     return run
 
 
@@ -101,14 +139,21 @@ async def compact_run(run_id: str, session: Session = Depends(get_session)):
     run = session.get(GenerationRun, run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Generation run not found")
-    if run.run_type not in ("resume", "resume_compact"):
+    if run.run_type not in ("resume", "resume_compact", "resume_pool"):
         raise HTTPException(status_code=400, detail="Only resume runs can be compacted")
     compact_run_obj = await compact_resume(run, session)
     return compact_run_obj
 
 
+def _get_nested(obj, path: str):
+    keys = path.split(".")
+    current = obj
+    for key in keys:
+        current = current[int(key)] if isinstance(current, list) else current[key]
+    return current
+
+
 def _mutate_array(obj: dict, path: str, op: str, value) -> None:
-    """Append to or delete from a nested list using dot-notation path."""
     keys = path.split(".")
     current = obj
     for key in keys[:-1]:
@@ -122,7 +167,6 @@ def _mutate_array(obj: dict, path: str, op: str, value) -> None:
 
 
 def _set_nested(obj: dict, path: str, value) -> None:
-    """Set a value in a nested dict/list using dot-notation path (e.g. 'sections.0.items.0.bullets.1.text')."""
     keys = path.split(".")
     current = obj
     for key in keys[:-1]:

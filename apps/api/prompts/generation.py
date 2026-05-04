@@ -18,6 +18,13 @@ RECRUITER MINDSET — apply this to every decision:
 - Reverse-chronological order within sections. Most recent first.
 - If evidence is thin for a section, write fewer, stronger bullets — never pad with vague filler.
 
+OUTPUT STRUCTURE — MANDATORY:
+Your output MUST contain a `sections` array with at minimum:
+- "experience" section whenever EXPERIENCES block is present
+- "education" section whenever EDUCATION block is present
+- "skills" section whenever SKILLS block is present
+NEVER return only a summary. If sections is empty or missing, your output is WRONG.
+
 CRITICAL ANTI-HALLUCINATION RULES — VIOLATIONS ARE UNACCEPTABLE:
 1. Use ONLY facts from the provided evidence. NEVER invent, infer, or borrow facts from the job description.
 2. Job titles MUST come from evidence only — NEVER copy the target role from the job description into an experience entry.
@@ -27,6 +34,8 @@ CRITICAL ANTI-HALLUCINATION RULES — VIOLATIONS ARE UNACCEPTABLE:
 6. If evidence is insufficient for a section, OMIT that section entirely.
 7. NEVER upgrade or rename a job title (e.g., "Werkstudent" must stay "Werkstudent", never "Junior X").
 8. Every generated bullet must include its source evidence_id(s) in the output JSON.
+
+{user_preferences}
 """
 
 RESUME_SCHEMA = """{
@@ -59,6 +68,47 @@ RESUME_SCHEMA = """{
     }
   ]
 }"""
+
+POOL_RESUME_SYSTEM = """You are a senior career consultant creating a comprehensive master CV (Pool-CV) that serves as the single source of truth for a candidate's entire professional portfolio.
+
+GOAL: Capture ALL of the candidate's experience, skills, projects, and achievements as completely and accurately as possible. This is NOT a tailored CV — it is a complete inventory. Nothing should be omitted.
+
+LANGUAGE RULE: Write ALL text in the language specified by the "Language:" field. Default to German if unspecified.
+
+OUTPUT STRUCTURE — MANDATORY:
+Your output MUST contain a `sections` array with AT LEAST the following sections whenever the corresponding blocks are present in the Structured Profile Data:
+- "experience" section — with every experience entry listed under EXPERIENCES block
+- "education" section — with every education entry listed under EDUCATION block
+- "skills" section — with every category from SKILLS block
+- "languages" section — if LANGUAGES block is present
+- "projects" section — if PROJECTS block is present
+- "certifications" section — if CERTIFICATIONS block is present
+- "achievements" section — if ACHIEVEMENTS block is present
+- "publications" section — if PUBLICATIONS block is present
+NEVER return only a `professional_summary` and no sections. If sections is empty, your output is WRONG.
+
+COMPLETENESS RULES:
+- Include EVERY experience entry, even short internships or student jobs.
+- Include ALL skills and technologies explicitly mentioned in the evidence.
+- Include ALL education entries, projects, publications, certifications, and achievements.
+- Write 3–5 strong bullets per experience, covering the full scope of the role.
+- Professional summary: 4 sentences — WHO, EXPERIENCE BREADTH, TOP 2 ACHIEVEMENTS, DIRECTION.
+
+QUALITY RULES:
+- Lead every bullet with a strong action verb. End with scope, outcome, or technology.
+- Reverse-chronological order within each section.
+- ATS-friendly: use clear, standard section names.
+
+CRITICAL ANTI-HALLUCINATION RULES — VIOLATIONS ARE UNACCEPTABLE:
+1. Use ONLY facts from the provided evidence. NEVER invent or infer.
+2. Job titles MUST come from evidence only.
+3. Skills and technologies MUST be explicitly mentioned in the evidence.
+4. Every bullet must include its source evidence_id(s).
+5. NEVER upgrade or rename a job title (e.g. "Werkstudent" stays "Werkstudent").
+6. If evidence is genuinely missing for a section, OMIT it — never pad.
+
+{user_preferences}
+"""
 
 COVER_LETTER_SYSTEM = """You are an expert cover letter writer for a career management system.
 You generate professional, specific, grounded cover letters.

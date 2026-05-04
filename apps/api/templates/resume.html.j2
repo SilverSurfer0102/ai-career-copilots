@@ -19,8 +19,21 @@
   }
 
   .header {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 16px;
     margin-bottom: 10px;
+  }
+  .header-text {
+    flex: 1;
+    text-align: center;
+  }
+  .header-photo {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
   }
   .header h1 {
     font-size: 22pt;
@@ -90,6 +103,8 @@
 <body>
 
 <div class="header">
+  {% if photo_url %}<img class="header-photo" src="{{ photo_url }}" alt="Photo">{% endif %}
+  <div class="header-text">
   <h1>{{ candidate_name }}</h1>
   <div class="contact-line">
     {%- set ns = namespace(first=true) -%}
@@ -99,6 +114,7 @@
     {%- if linkedin %}{{ sep() }}<a href="{{ linkedin }}">{{ linkedin | replace('https://','') | replace('http://','') }}</a>{% set ns.first = false %}{% endif -%}
     {%- if github %}{{ sep() }}<a href="{{ github }}">{{ github | replace('https://','') | replace('http://','') }}</a>{% set ns.first = false %}{% endif -%}
     {%- if website and website != linkedin and website != github %}{{ sep() }}<a href="{{ website }}">{{ website | replace('https://','') | replace('http://','') }}</a>{% endif -%}
+  </div>
   </div>
 </div>
 

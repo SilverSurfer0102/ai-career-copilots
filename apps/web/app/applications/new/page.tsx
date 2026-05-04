@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { ProfilePicker } from "@/components/profile-picker";
 
 export default function NewApplicationPage() {
   const router = useRouter();
@@ -88,18 +89,12 @@ export default function NewApplicationPage() {
               </button>
             </p>
           ) : (
-            <div className="flex flex-col gap-1">
-              <Label>Profil wählen</Label>
-              <select
-                value={profileId}
-                onChange={(e) => setProfileId(e.target.value)}
-                className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
-              >
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>{p.display_name}</option>
-                ))}
-              </select>
-            </div>
+            <ProfilePicker
+              profiles={profiles}
+              selectedId={profileId || null}
+              onSelect={setProfileId}
+              onCreateNew={() => router.push("/profile")}
+            />
           )}
         </CardContent>
       </Card>

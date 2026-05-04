@@ -54,6 +54,15 @@ export const api = {
         (r) => r.json()
       );
     },
+    uploadPhoto: (id: string, file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return fetch(`${API_BASE}/profiles/${id}/photo`, { method: "POST", body: form }).then(
+        (r) => r.ok ? r.json() as Promise<{ photo_url: string }> : r.text().then((t) => Promise.reject(new Error(t)))
+      );
+    },
+    deletePhoto: (id: string) => apiDelete(`/profiles/${id}/photo`),
+    photoUrl: (id: string) => `${API_BASE}/profiles/${id}/photo`,
   },
   blocks: {
     createExperience: (pid: string, data: Partial<Experience>) =>
@@ -112,6 +121,11 @@ export const api = {
       }),
   },
   generate: {
+    poolResume: (profile_id: string, options?: Record<string, unknown>) =>
+      apiFetch<GenerationRun>("/generate/pool-resume", {
+        method: "POST",
+        body: JSON.stringify({ profile_id, options: options ?? {} }),
+      }),
     resume: (req: GenerationRequest) =>
       apiFetch<GenerationRun>("/generate/resume", { method: "POST", body: JSON.stringify(req) }),
     coverLetter: (req: GenerationRequest) =>
@@ -181,6 +195,7 @@ export interface Profile {
   website?: string;
   linkedin_url?: string;
   github_url?: string;
+  photo_path?: string;
   target_roles: string[];
   summary_variants: string[];
   preferences: Record<string, unknown>;

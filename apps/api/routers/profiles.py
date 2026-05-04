@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
 from database import get_session
@@ -69,6 +70,63 @@ def delete_profile(profile_id: str, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Profile not found")
     session.delete(profile)
     session.commit()
+
+
+@router.post("/{profile_id}/photo")
+async def upload_profile_photo(
+    profile_id: str,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+):
+    profile = session.get(CandidateProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    allowed = {".jpg", ".jpeg", ".png", ".webp"}
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in allowed:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, WEBP allowed")
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 5 MB)")
+
+    upload_dir = os.path.join(settings.upload_dir, profile_id)
+    os.makedirs(upload_dir, exist_ok=True)
+    dest_path = os.path.join(upload_dir, f"profile_photo{ext}")
+
+    with open(dest_path, "wb") as f:
+        f.write(content)
+
+    profile.photo_path = dest_path
+    profile.updated_at = datetime.utcnow()
+    session.add(profile)
+    session.commit()
+
+    return {"photo_url": f"/api/profiles/{profile_id}/photo"}
+
+
+@router.delete("/{profile_id}/photo", status_code=204)
+def delete_profile_photo(profile_id: str, session: Session = Depends(get_session)):
+    profile = session.get(CandidateProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if profile.photo_path and os.path.exists(profile.photo_path):
+        os.remove(profile.photo_path)
+    profile.photo_path = None
+    profile.updated_at = datetime.utcnow()
+    session.add(profile)
+    session.commit()
+
+
+@router.get("/{profile_id}/photo")
+def get_profile_photo(profile_id: str, session: Session = Depends(get_session)):
+    profile = session.get(CandidateProfile, profile_id)
+    if not profile or not profile.photo_path:
+        raise HTTPException(status_code=404, detail="No photo")
+    if not os.path.exists(profile.photo_path):
+        raise HTTPException(status_code=404, detail="Photo file not found")
+    return FileResponse(profile.photo_path)
 
 
 @router.post("/{profile_id}/import")

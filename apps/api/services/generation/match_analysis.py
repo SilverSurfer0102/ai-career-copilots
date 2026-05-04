@@ -1,17 +1,24 @@
+import logging
 from datetime import datetime
 from sqlmodel import Session, select
 
+from fastapi import HTTPException
 from models import CandidateProfile, JobDescription, GenerationRun, EvidenceItem, Skill
 from schemas.generation import GenerationRequest
 from services.ai_client import structured_generation
 from prompts.generation import MATCH_ANALYSIS_SYSTEM, MATCH_ANALYSIS_SCHEMA
 from config import settings
 
+logger = logging.getLogger(__name__)
+
 
 async def generate_match_analysis(payload: GenerationRequest, session: Session) -> GenerationRun:
     profile = session.get(CandidateProfile, payload.profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
     job = session.get(JobDescription, payload.job_id)
-    assert profile and job
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
 
     skills = session.exec(select(Skill).where(Skill.profile_id == payload.profile_id)).all()
     skill_names = [s.name for s in skills]

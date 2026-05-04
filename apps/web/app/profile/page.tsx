@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { ProfilePicker } from "@/components/profile-picker";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -721,51 +722,65 @@ export default function ProfilePage() {
     toast.success("Profil gelöscht");
   };
 
+  const [showNewProfile, setShowNewProfile] = useState(false);
+  const [newProfileName, setNewProfileName] = useState("");
+  const [creatingQuick, setCreatingQuick] = useState(false);
+
+  const createQuickProfile = async () => {
+    if (!newProfileName.trim()) return;
+    setCreatingQuick(true);
+    try {
+      const p = await api.profiles.create({ display_name: newProfileName.trim(), target_roles: [], summary_variants: [] });
+      setAllProfiles((prev) => [...prev, p]);
+      setShowNewProfile(false);
+      setNewProfileName("");
+      switchProfile(p.id);
+      toast.success("Profil erstellt");
+    } catch (e) { toast.error(String(e)); }
+    finally { setCreatingQuick(false); }
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-serif font-semibold">Profil</h1>
-        {allProfiles.length > 1 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Aktives Profil:</span>
-            <select
-              value={profile?.id || ""}
-              onChange={(e) => switchProfile(e.target.value)}
-              className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm"
-            >
-              {allProfiles.map((p) => (
-                <option key={p.id} value={p.id}>{p.display_name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
+      <h1 className="text-2xl font-serif font-semibold">Profil</h1>
 
-      {allProfiles.length > 1 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm flex items-start gap-3">
-          <span className="text-amber-800">
-            <strong>Du hast {allProfiles.length} Profile.</strong> Wähle oben das richtige aus oder lösche ein Duplikat.
-          </span>
-          <div className="ml-auto flex gap-2 flex-wrap">
-            {allProfiles.map((p) => (
-              <div key={p.id} className="flex items-center gap-1 bg-white border rounded px-2 py-1 text-xs">
-                <span className={p.id === profile?.id ? "font-bold text-primary" : "text-muted-foreground"}>
-                  {p.display_name}
-                </span>
-                {p.id !== profile?.id && (
-                  <button
-                    onClick={() => deleteProfile(p.id)}
-                    className="text-red-400 hover:text-red-600 ml-1 font-bold"
-                    title="Profil löschen"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Visual Profile Picker */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Profil wählen</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {showNewProfile ? (
+            <div className="flex gap-2 items-center">
+              <input
+                autoFocus value={newProfileName}
+                onChange={(e) => setNewProfileName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") createQuickProfile(); if (e.key === "Escape") setShowNewProfile(false); }}
+                placeholder="Name des neuen Profils…"
+                className="flex-1 border border-border rounded-lg px-3 py-1.5 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <Button size="sm" onClick={createQuickProfile} disabled={creatingQuick}>{creatingQuick ? "…" : "Erstellen"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowNewProfile(false)}>Abbruch</Button>
+            </div>
+          ) : (
+            <ProfilePicker
+              profiles={allProfiles}
+              selectedId={profile?.id ?? null}
+              onSelect={switchProfile}
+              onCreateNew={() => setShowNewProfile(true)}
+              onPhotoUploaded={() => api.profiles.list().then(setAllProfiles)}
+            />
+          )}
+          {profile && (
+            <button
+              onClick={() => deleteProfile(profile.id)}
+              className="self-start text-xs text-red-400 hover:text-red-600"
+            >
+              Dieses Profil löschen
+            </button>
+          )}
+        </CardContent>
+      </Card>
 
       {!profile && (
         <Card>

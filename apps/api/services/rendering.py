@@ -1,3 +1,4 @@
+import base64
 import copy
 import json
 import logging
@@ -24,6 +25,20 @@ def _parse_json_field(val, fallback):
     return val if val is not None else fallback
 
 
+def _photo_data_url(photo_path: str) -> str | None:
+    if not photo_path or not os.path.exists(photo_path):
+        return None
+    ext = photo_path.rsplit(".", 1)[-1].lower()
+    mime = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "webp": "webp"}.get(ext, "jpeg")
+    try:
+        with open(photo_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        return f"data:image/{mime};base64,{b64}"
+    except Exception:
+        logger.warning("Could not read photo at %s", photo_path)
+        return None
+
+
 def render_resume_html(run, profile=None) -> str:
     outputs = run.generation_outputs or {}
     template = _jinja_env.get_template("resume.html.j2")
@@ -34,13 +49,15 @@ def render_resume_html(run, profile=None) -> str:
 
     sections = _parse_json_field(outputs.get("sections", []), [])
 
-    email = phone = linkedin = github = website = ""
+    email = phone = linkedin = github = website = photo_url = ""
     if profile:
         email = profile.email or ""
         phone = profile.phone or ""
         linkedin = profile.linkedin_url or ""
         github = profile.github_url or ""
         website = profile.website or ""
+        if profile.photo_path:
+            photo_url = _photo_data_url(profile.photo_path) or ""
 
     gen_inputs = run.generation_inputs or {}
     lang = gen_inputs.get("options", {}).get("language_override") or "en"
@@ -53,6 +70,7 @@ def render_resume_html(run, profile=None) -> str:
         linkedin=linkedin,
         github=github,
         website=website,
+        photo_url=photo_url,
         professional_summary=summary_text,
         sections=sections,
         lang=lang,

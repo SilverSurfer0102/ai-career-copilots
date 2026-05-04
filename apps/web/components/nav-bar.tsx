@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/applications", label: "Bewerbungen" },
   { href: "/profile", label: "Profil" },
+  { href: "/pool-cv", label: "Pool-CV" },
   { href: "/jobs", label: "Jobs" },
 ];
 
@@ -13,7 +14,7 @@ export function NavBar() {
   const isActive = (href: string) =>
     href === "/applications"
       ? pathname === href || pathname.startsWith("/applications")
-      : pathname === href;
+      : pathname.startsWith(href);
 
   return (
     <nav className="border-b bg-secondary shadow-sm">

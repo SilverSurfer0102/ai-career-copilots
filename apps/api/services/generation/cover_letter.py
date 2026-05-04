@@ -1,6 +1,8 @@
+import logging
 from datetime import datetime
 from sqlmodel import Session, select
 
+from fastapi import HTTPException
 from models import CandidateProfile, JobDescription, GenerationRun, EvidenceItem
 from schemas.generation import GenerationRequest
 from services.ai_client import structured_generation
@@ -8,11 +10,16 @@ from services.retrieval import build_evidence_pack
 from prompts.generation import COVER_LETTER_SYSTEM, COVER_LETTER_SCHEMA
 from config import settings
 
+logger = logging.getLogger(__name__)
+
 
 async def generate_cover_letter(payload: GenerationRequest, session: Session) -> GenerationRun:
     profile = session.get(CandidateProfile, payload.profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
     job = session.get(JobDescription, payload.job_id)
-    assert profile and job
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
 
     if payload.selected_evidence_ids:
         evidence_ids = payload.selected_evidence_ids

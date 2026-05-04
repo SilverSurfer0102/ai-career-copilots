@@ -1,12 +1,17 @@
+import asyncio
 import base64
 import json
 import logging
 import re
+
+import anthropic
 from anthropic import AsyncAnthropic
 from config import settings
 
 logger = logging.getLogger(__name__)
 _client: AsyncAnthropic | None = None
+
+_RETRY_DELAYS = [5, 15, 45, 120]
 
 
 def get_client() -> AsyncAnthropic:
@@ -14,6 +19,40 @@ def get_client() -> AsyncAnthropic:
     if _client is None:
         _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
     return _client
+
+
+async def _call_with_retry(coro_factory, max_retries: int = 4):
+    """Exponential backoff on RateLimitError and 5xx errors."""
+    for attempt in range(max_retries + 1):
+        try:
+            return await coro_factory()
+        except anthropic.RateLimitError as e:
+            if attempt == max_retries:
+                raise
+            retry_after = _parse_retry_after(e) or _RETRY_DELAYS[min(attempt, len(_RETRY_DELAYS) - 1)]
+            logger.warning(
+                "RateLimit hit, retrying in %ds (attempt %d/%d)", retry_after, attempt + 1, max_retries
+            )
+            await asyncio.sleep(retry_after)
+        except anthropic.APIStatusError as e:
+            if e.status_code >= 500 and attempt < max_retries:
+                delay = _RETRY_DELAYS[min(attempt, len(_RETRY_DELAYS) - 1)]
+                logger.warning("API %d error, retrying in %ds (attempt %d/%d)", e.status_code, delay, attempt + 1, max_retries)
+                await asyncio.sleep(delay)
+            else:
+                raise
+
+
+def _parse_retry_after(exc: anthropic.RateLimitError) -> int | None:
+    try:
+        response = getattr(exc, "response", None)
+        if response is not None:
+            val = response.headers.get("retry-after")
+            if val:
+                return int(float(val)) + 1
+    except Exception:
+        pass
+    return None
 
 
 def _fix_json_strings(raw: str) -> str:
@@ -45,7 +84,6 @@ def _fix_json_strings(raw: str) -> str:
             continue
         result.append(ch)
     fixed = "".join(result)
-    # Remove trailing commas before } or ]
     fixed = re.sub(r",(\s*[}\]])", r"\1", fixed)
     return fixed
 
@@ -67,11 +105,7 @@ def _extract_json(raw: str) -> dict:
 
 
 def _unwrap_json_strings(obj):
-    """Recursively parse any string values that are valid JSON arrays/objects.
-
-    Tool-Use sometimes encodes nested structures as JSON strings when the
-    input_schema doesn't declare explicit types for those fields.
-    """
+    """Recursively parse any string values that are valid JSON arrays/objects."""
     if isinstance(obj, dict):
         return {k: _unwrap_json_strings(v) for k, v in obj.items()}
     if isinstance(obj, list):
@@ -114,20 +148,29 @@ async def structured_generation(
         f"Call return_structured_data with a result matching this schema exactly:\n"
         f"{schema_description}"
     )
-    message = await client.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=max_tokens,
-        system=system,
-        tools=[tool],
-        tool_choice={"type": "tool", "name": "return_structured_data"},
-        messages=[{"role": "user", "content": full_user}],
-    )
+
+    def _create():
+        return client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=max_tokens,
+            system=system,
+            tools=[tool],
+            tool_choice={"type": "tool", "name": "return_structured_data"},
+            messages=[{"role": "user", "content": full_user}],
+        )
+
+    message = await _call_with_retry(_create)
+
     if message.stop_reason == "max_tokens":
-        logger.warning("Response truncated (max_tokens=%d) — output may be incomplete", max_tokens)
+        logger.error("Response truncated at max_tokens=%d — output is incomplete", max_tokens)
+        raise ValueError(
+            f"Output truncated (max_tokens={max_tokens}). The CV is too large — reduce evidence or increase budget."
+        )
+
     for block in message.content:
         if hasattr(block, "type") and block.type == "tool_use" and block.name == "return_structured_data":
             return _unwrap_json_strings(block.input)
-    # Fallback: tool_choice was forced so this branch should never run
+
     raw = message.content[0].text.strip() if message.content else "{}"
     logger.warning("Tool-use fallback triggered — parsing text response")
     return _extract_json(raw)
@@ -160,17 +203,27 @@ async def structured_generation_with_pdf(
         ]
     else:
         content = user + schema_instruction
-    message = await client.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=max_tokens,
-        system=system,
-        tools=[tool],
-        tool_choice={"type": "tool", "name": "return_structured_data"},
-        messages=[{"role": "user", "content": content}],
-    )
+
+    def _create():
+        return client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=max_tokens,
+            system=system,
+            tools=[tool],
+            tool_choice={"type": "tool", "name": "return_structured_data"},
+            messages=[{"role": "user", "content": content}],
+        )
+
+    message = await _call_with_retry(_create)
+
+    if message.stop_reason == "max_tokens":
+        logger.error("Response truncated at max_tokens=%d for PDF call — output is incomplete", max_tokens)
+        raise ValueError(f"Output truncated (max_tokens={max_tokens}). Reduce input size or increase budget.")
+
     for block in message.content:
         if hasattr(block, "type") and block.type == "tool_use" and block.name == "return_structured_data":
             return _unwrap_json_strings(block.input)
+
     raw = message.content[0].text.strip() if message.content else "{}"
     logger.warning("Tool-use fallback triggered for PDF call — parsing text response")
     return _extract_json(raw)

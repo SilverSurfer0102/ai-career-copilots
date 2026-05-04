@@ -24,6 +24,7 @@ class CandidateProfile(SQLModel, table=True):
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
     github_url: Optional[str] = None
+    photo_path: Optional[str] = None
     target_roles: list = Field(default_factory=list, sa_column=Column(JSON))
     summary_variants: list = Field(default_factory=list, sa_column=Column(JSON))
     preferences: dict = Field(default_factory=dict, sa_column=Column(JSON))
@@ -225,15 +226,29 @@ class Application(SQLModel, table=True):
     model_config = {"arbitrary_types_allowed": True}
 
 
+class EditFeedback(SQLModel, table=True):
+    __tablename__ = "edit_feedback"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    profile_id: str = Field(foreign_key="candidate_profile.id", index=True)
+    run_id: str = Field(foreign_key="generation_run.id")
+    run_type: str
+    field_path: str
+    field_context: str
+    original_value: str
+    edited_value: str
+    created_at: datetime = Field(default_factory=_now)
+
+
 class GenerationRun(SQLModel, table=True):
     __tablename__ = "generation_run"
 
     id: str = Field(default_factory=_uuid, primary_key=True)
     profile_id: str = Field(foreign_key="candidate_profile.id")
-    job_description_id: str = Field(foreign_key="job_description.id")
+    job_description_id: Optional[str] = Field(default=None, foreign_key="job_description.id")
     application_id: Optional[str] = Field(default=None, foreign_key="application.id")
-    run_type: str  # "resume" | "cover_letter" | "match_analysis" | "resume_compact"
-    status: str = "pending"  # "pending" | "running" | "done" | "failed"
+    run_type: str  # "resume" | "cover_letter" | "match_analysis" | "resume_compact" | "resume_pool"
+    status: str = "pending"  # "pending" | "running" | "completed" | "failed"
     selected_evidence_ids: list = Field(default_factory=list, sa_column=Column(JSON))
     generation_inputs: dict = Field(default_factory=dict, sa_column=Column(JSON))
     generation_outputs: dict = Field(default_factory=dict, sa_column=Column(JSON))

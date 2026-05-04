@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from sqlmodel import Session
 
+from fastapi import HTTPException
 from models import (
     CandidateProfile, Experience, Project, Skill, LanguageSkill,
     Education, Publication, Certification, Achievement, EvidenceItem,
@@ -57,7 +58,8 @@ async def ingest_document(
 
     entity_links = []
     profile = session.get(CandidateProfile, profile_id)
-    assert profile is not None
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
 
     personal = extracted.get("personal", {})
     if personal.get("display_name") and not profile.display_name:
@@ -220,7 +222,8 @@ async def ingest_freetext(
 
     entity_links = []
     profile = session.get(CandidateProfile, profile_id)
-    assert profile is not None
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
 
     personal = extracted.get("personal", {})
     if personal.get("display_name") and not profile.display_name:
