@@ -190,8 +190,8 @@ def _assemble_resume_output(
             "subtitle": ed.institution or "",
             "date_range": format_date_range(ed.start_date, ed.end_date, lang),
             "location": "",
-            "bullets": [{"text": a, "evidence_ids": []} for a in (ed.achievements or [])],
-            "metadata": {},
+            "bullets": _resolve_bullets(ed.id, ed.achievements, bullet_candidates, picks_by_parent),
+            "metadata": {"parent_id": ed.id},
         } for ed in educations]
         sections.append({"section_type": "education", "title": _section_title("education", lang), "items": items})
 
