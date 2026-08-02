@@ -46,6 +46,8 @@ async def generate_resume(
     projects = session.exec(
         select(Project).where(Project.profile_id == payload.profile_id)
     ).all()
+    skills = session.exec(select(Skill).where(Skill.profile_id == payload.profile_id)).all()
+    achievements = session.exec(select(Achievement).where(Achievement.profile_id == payload.profile_id)).all()
 
     bullet_candidates = collect_bullet_candidates(payload.profile_id, session)
     summary_candidates = collect_summary_candidates(payload.profile_id, session)
@@ -71,6 +73,13 @@ async def generate_resume(
         f"  - [{b.id}] {b.text[:200]}" for b in summary_candidates
     ) or "  (no approved summary candidates — professional_summary will be omitted)"
 
+    skills_block = "\n".join(
+        f"  - [{s.id}] {s.name} ({s.category or 'other'})" for s in skills
+    ) or "  (none)"
+    achievements_block = "\n".join(
+        f"  - [{a.id}] {a.statement or ''} ({a.metric_value or ''})" for a in achievements
+    ) or "  (none)"
+
     user_prompt = (
         f"Select and order content blocks for a tailored resume.\n\n"
         f"## Job\nTitle: {job.title}\nCompany: {job.company}\n"
@@ -80,6 +89,8 @@ async def generate_resume(
         f"## Summary candidates\n{summary_block}\n\n"
         f"{render_bullet_candidates_block('## Experience entries', exp_entries)}\n\n"
         f"{render_bullet_candidates_block('## Project entries', proj_entries)}\n\n"
+        f"## Skill candidates ({len(skills)} total — select a focused, relevant subset)\n{skills_block}\n\n"
+        f"## Achievement candidates\n{achievements_block}\n\n"
         f"Language: {lang}\n{feedback_context}"
     )
 
@@ -101,7 +112,7 @@ async def generate_resume(
 
     result = _assemble_resume_output(
         profile=profile, job=job, lang=lang, selection=selection,
-        experiences=experiences, projects=projects,
+        experiences=experiences, projects=projects, skills=skills, achievements=achievements,
         bullet_candidates=bullet_candidates, summary_candidates=summary_candidates,
         session=session,
     )
@@ -133,7 +144,7 @@ async def generate_resume(
 
 
 def _assemble_resume_output(
-    profile, job, lang, selection, experiences, projects,
+    profile, job, lang, selection, experiences, projects, skills, achievements,
     bullet_candidates, summary_candidates, session,
 ) -> dict:
     """Builds the final document deterministically. The LLM only supplied ids —
@@ -195,10 +206,12 @@ def _assemble_resume_output(
         } for ed in educations]
         sections.append({"section_type": "education", "title": _section_title("education", lang), "items": items})
 
-    skills = session.exec(select(Skill).where(Skill.profile_id == profile.id)).all()
-    if skills:
+    included_skill_ids = set(selection.get("included_skill_ids") or [])
+    valid_skill_ids = {s.id for s in skills}
+    selected_skills = [s for s in skills if s.id in included_skill_ids & valid_skill_ids] or skills
+    if selected_skills:
         by_cat: dict = defaultdict(list)
-        for s in skills:
+        for s in selected_skills:
             by_cat[s.category or "Sonstige"].append(s.name)
         sections.append({
             "section_type": "skills",
@@ -234,15 +247,17 @@ def _assemble_resume_output(
             } for c in certs],
         })
 
-    achievements = session.exec(select(Achievement).where(Achievement.profile_id == profile.id)).all()
-    if achievements:
+    included_achievement_ids = set(selection.get("included_achievement_ids") or [])
+    valid_achievement_ids = {a.id for a in achievements}
+    selected_achievements = [a for a in achievements if a.id in included_achievement_ids & valid_achievement_ids]
+    if selected_achievements:
         sections.append({
             "section_type": "achievements",
             "title": _section_title("achievements", lang),
             "items": [{
                 "item_type": "achievement", "title": a.statement or "", "subtitle": a.context,
                 "date_range": a.metric_value, "location": None, "bullets": [], "metadata": {},
-            } for a in achievements],
+            } for a in selected_achievements],
         })
 
     publications = session.exec(select(Publication).where(Publication.profile_id == profile.id)).all()

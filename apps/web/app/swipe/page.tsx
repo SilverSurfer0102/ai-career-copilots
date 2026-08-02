@@ -26,6 +26,7 @@ export default function SwipePage() {
 
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
+  const [excludeSenior, setExcludeSenior] = useState(true);
   const [searching, setSearching] = useState(false);
 
   const [pasteText, setPasteText] = useState("");
@@ -101,7 +102,7 @@ export default function SwipePage() {
     if (!query.trim()) { toast.error("Suchbegriff eingeben"); return; }
     setSearching(true);
     try {
-      const created = await api.leads.searchBundesagentur(query.trim(), location.trim());
+      const created = await api.leads.searchBundesagentur(query.trim(), location.trim(), 25, 25, excludeSenior);
       toast.success(`${created.length} neue Stelle(n) gefunden`);
       loadQueue();
     } catch (e) {
@@ -167,6 +168,14 @@ export default function SwipePage() {
               <Label htmlFor="loc" className="text-xs">Ort</Label>
               <Input id="loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="z. B. Nürnberg" />
             </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={excludeSenior}
+                onChange={(e) => setExcludeSenior(e.target.checked)}
+              />
+              Senior/Lead/Head-Titel ausfiltern (die API selbst kennt keinen Erfahrungs-Filter)
+            </label>
             <Button size="sm" onClick={handleSearch} disabled={searching} className="w-full">
               {searching ? "Suche…" : "Suchen"}
             </Button>

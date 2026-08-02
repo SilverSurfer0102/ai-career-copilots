@@ -17,6 +17,13 @@ RULES — READ CAREFULLY:
    invent a summary — if nothing fits, return null.
 7. target_role: a short, honest headline for the position, derived from the job title. Never
    claim a title, seniority, or specialization the candidate has not held.
+8. Skills: the candidate list may contain 50–150+ entries accumulated from many uploaded
+   documents — a recruiter reading a resume with all of them looks unimpressed, not impressed.
+   Select only the skills genuinely relevant to THIS job's requirements — normally 15–25 total
+   across categories for a focused CV. Never invent a skill not in the candidate list.
+9. Achievements: select at most 3–4 of the most impressive and relevant achievements for this
+   job. Prefer achievements that are NOT already fully covered by a bullet you picked above —
+   redundancy between sections reads as padding. Never invent.
 
 Return ONLY the JSON described below. No commentary, no markdown fences.
 """
@@ -27,7 +34,9 @@ SELECTION_SCHEMA = """{
   "picks": [
     {"parent_id": "string", "block_ids": ["string"]}
   ],
-  "included_project_ids": ["string"]
+  "included_project_ids": ["string"],
+  "included_skill_ids": ["string"],
+  "included_achievement_ids": ["string"]
 }"""
 
 RESUME_SCHEMA = """{

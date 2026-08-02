@@ -9,6 +9,7 @@ that would violate their terms of service (see docs/PLAN-v2-bausteinsystem.md).
 import base64
 import hashlib
 import logging
+import re
 
 import httpx
 
@@ -16,6 +17,30 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service"
 _HEADERS = {"X-API-Key": "jobboerse-jobsuche"}
+
+# The API has no working seniority filter (verified live: `berufserfahrung` param
+# is silently ignored, result count is identical with/without it and even with
+# garbage values). This is the only real lever — a title blocklist applied
+# client-side after fetching.
+_SENIOR_TITLE_PATTERN = re.compile(
+    r"\b(senior|sr\.?|lead|head of|principal|director|direktor|geschäftsführer|"
+    r"abteilungsleit|teamleit|bereichsleit|manager)\b",
+    re.IGNORECASE,
+)
+# An explicit junior-signal in the title overrides a "manager"-type match — titles
+# like "Junior Sales Manager" or "Junior Account Manager" are entry-level roles
+# even though "Manager" alone would otherwise look senior.
+_JUNIOR_OVERRIDE_PATTERN = re.compile(
+    r"\b(junior|trainee|praktikum|praktikant|werkstudent|einsteiger|azubi|auszubildende)\b",
+    re.IGNORECASE,
+)
+
+
+def is_senior_title(title: str) -> bool:
+    title = title or ""
+    if _JUNIOR_OVERRIDE_PATTERN.search(title):
+        return False
+    return bool(_SENIOR_TITLE_PATTERN.search(title))
 
 
 def dedupe_hash(company: str | None, title: str, location: str | None) -> str:

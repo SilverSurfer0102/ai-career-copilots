@@ -21,6 +21,8 @@ async def search_bundesagentur(payload: LeadSearchRequest, session: Session = De
         query=payload.query, location=payload.location,
         radius_km=payload.radius_km, size=payload.size,
     )
+    if payload.exclude_senior:
+        found = [lead for lead in found if not bundesagentur.is_senior_title(lead["title"])]
     existing_hashes = set(session.exec(select(JobLead.dedupe_hash)).all())
     created = []
     for lead in found:

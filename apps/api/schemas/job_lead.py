@@ -8,6 +8,7 @@ class LeadSearchRequest(BaseModel):
     location: str = ""
     radius_km: int = 25
     size: int = 25
+    exclude_senior: bool = True
 
 
 class LeadPasteRequest(BaseModel):
