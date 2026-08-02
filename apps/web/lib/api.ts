@@ -215,6 +215,7 @@ export interface ProfileCreate {
   target_roles?: string[];
   summary_variants?: string[];
   default_languages?: string[];
+  preferences?: Record<string, unknown>;
 }
 
 export interface ProfileBlocks {

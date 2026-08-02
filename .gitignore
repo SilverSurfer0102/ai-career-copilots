@@ -32,3 +32,4 @@ models/
 apps/api/.venv/
 apps/web/.next/
 apps/web/node_modules/
+START.txt
