@@ -154,6 +154,20 @@ export const api = {
     coverLetterPdfUrl: (run_id: string) => `${API_BASE}/export/runs/${run_id}/cover-letter/pdf`,
     resumeLatexUrl: (run_id: string, template: string) =>
       `${API_BASE}/export/runs/${run_id}/resume/latex?template=${template}`,
+    batchExportZip: async (application_ids: string[], theme = "modern") => {
+      const res = await fetch(`${API_BASE}/export/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ application_ids, theme }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const skippedHeader = res.headers.get("X-Batch-Export-Skipped");
+      const skipped: { application_id: string; reason: string }[] = skippedHeader
+        ? JSON.parse(skippedHeader)
+        : [];
+      const blob = await res.blob();
+      return { blob, skipped };
+    },
   },
   applications: {
     list: () => apiFetch<Application[]>("/applications"),
@@ -163,6 +177,31 @@ export const api = {
     update: (id: string, data: Partial<ApplicationUpdate>) =>
       apiFetch<Application>(`/applications/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     delete: (id: string) => apiDelete(`/applications/${id}`),
+  },
+  leads: {
+    list: (status: string | null = "new") =>
+      apiFetch<JobLead[]>(`/leads${status ? `?status=${status}` : ""}`),
+    searchBundesagentur: (query: string, location: string, radius_km = 25, size = 25) =>
+      apiFetch<JobLead[]>("/leads/search-bundesagentur", {
+        method: "POST",
+        body: JSON.stringify({ query, location, radius_km, size }),
+      }),
+    paste: (data: { url?: string; raw_text: string; title?: string; company?: string; location?: string }) =>
+      apiFetch<JobLead>("/leads/paste", { method: "POST", body: JSON.stringify(data) }),
+    updateStatus: (id: string, status: string) =>
+      apiFetch<JobLead>(`/leads/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    convert: (id: string, profile_id: string) =>
+      apiFetch<{ job_id: string; application_id: string }>(
+        `/leads/${id}/convert?profile_id=${encodeURIComponent(profile_id)}`,
+        { method: "POST" }
+      ),
+    delete: (id: string) => apiDelete(`/leads/${id}`),
+  },
+  preflight: {
+    runReport: (run_id: string) => apiFetch<PreflightReport>(`/preflight/runs/${run_id}`),
+    applicationReport: (application_id: string) =>
+      apiFetch<ApplicationPreflightReport>(`/preflight/applications/${application_id}`),
+    diff: (run_id: string) => apiFetch<ResumeDiff>(`/preflight/runs/${run_id}/diff`),
   },
   runs: {
     list: (params: { application_id?: string; run_type?: string; profile_id?: string }) => {
@@ -457,4 +496,56 @@ export interface RunSummary {
 
 export interface ApplicationDetail extends Application {
   runs: RunSummary[];
+}
+
+export interface JobLead {
+  id: string;
+  source: string;
+  external_id?: string;
+  title: string;
+  company?: string;
+  location?: string;
+  url?: string;
+  raw_text: string;
+  posted_at?: string;
+  status: string;
+  score?: number;
+  created_at: string;
+}
+
+export interface PreflightCheck {
+  code: string;
+  label: string;
+  status: "pass" | "warn" | "block";
+  detail?: string;
+}
+
+export interface PreflightReport {
+  run_id: string;
+  run_type: string;
+  overall: "pass" | "warn" | "block";
+  checks: PreflightCheck[];
+}
+
+export interface ApplicationPreflightReport {
+  application_id: string;
+  overall: "pass" | "warn" | "block";
+  resume?: PreflightReport;
+  cover_letter?: PreflightReport;
+}
+
+export interface ResumeDiffEntry {
+  parent_id: string;
+  title: string;
+  subtitle: string;
+  included: string[];
+  dropped: string[];
+  is_legacy_fallback: boolean;
+}
+
+export interface ResumeDiff {
+  run_id: string;
+  summary_included: string | null;
+  summary_dropped: string[];
+  entries: ResumeDiffEntry[];
 }

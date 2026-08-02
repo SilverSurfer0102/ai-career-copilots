@@ -3,124 +3,148 @@
 <head>
 <meta charset="UTF-8">
 <title>{{ candidate_name }}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --accent: {{ '#1f2937' if theme == 'classic' else '#1d4c8f' }};
+    --text: #1a1a1a;
+    --muted: #5b5f66;
+    --rule: {{ '#1a1a1a' if theme == 'classic' else '#d8dee8' }};
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: 'Roboto', Arial, sans-serif;
+    font-family: "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
     font-size: 10pt;
-    color: #1a1a1a;
+    color: var(--text);
     background: #fff;
-    padding: 1.8cm 1.8cm 2cm;
+    padding: 1.6cm 1.9cm 1.8cm;
     max-width: 21cm;
     margin: 0 auto;
   }
 
   .header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: 16px;
-    margin-bottom: 10px;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 10px;
+    margin-bottom: 14px;
   }
-  .header-text {
-    flex: 1;
-    text-align: center;
-  }
+  .header-text { flex: 1; }
   .header-photo {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
+    width: 76px;
+    height: 76px;
+    border-radius: 4px;
     object-fit: cover;
     flex-shrink: 0;
   }
   .header h1 {
-    font-size: 22pt;
+    font-size: 21pt;
     font-weight: 700;
-    letter-spacing: 0.03em;
-    margin-bottom: 5px;
+    letter-spacing: 0.01em;
+    color: var(--text);
+  }
+  .header .target-role {
+    font-size: 11pt;
+    color: var(--accent);
+    font-weight: 500;
+    margin-top: 2px;
   }
   .contact-line {
     font-size: 9pt;
-    color: #333;
+    color: var(--muted);
     display: flex;
-    justify-content: center;
     flex-wrap: wrap;
-    gap: 0 6px;
+    gap: 0 8px;
     align-items: center;
+    margin-top: 6px;
   }
-  .contact-line a { color: #1a1a1a; text-decoration: none; }
-  .sep { color: #888; padding: 0 2px; }
+  .contact-line a { color: var(--muted); text-decoration: none; }
+  .sep { color: #b8bcc4; }
 
-  section { margin-top: 10px; }
+  section { margin-top: 12px; break-inside: avoid-page; }
   section h2 {
-    font-size: 11.5pt;
+    font-size: 10.5pt;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    border-bottom: 1.5px solid #1a1a1a;
-    padding-bottom: 2px;
-    margin-bottom: 6px;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 3px;
+    margin-bottom: 8px;
   }
 
   .summary p {
-    font-size: 9.5pt;
-    line-height: 1.45;
+    font-size: 9.8pt;
+    line-height: 1.5;
+    color: var(--text);
   }
 
-  .entry { margin-bottom: 7px; }
+  .entry { margin-bottom: 9px; break-inside: avoid; page-break-inside: avoid; }
   .entry-header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    gap: 10px;
   }
   .entry-title  { font-weight: 700; font-size: 10pt; }
-  .entry-date   { font-size: 9pt; color: #333; white-space: nowrap; }
-  .entry-subrow { margin-top: 1px; margin-bottom: 2px; }
-  .entry-subtitle { font-style: italic; font-size: 9pt; color: #444; }
+  .entry-date   { font-size: 9pt; color: var(--muted); white-space: nowrap; }
+  .entry-subrow { margin-top: 1px; margin-bottom: 3px; }
+  .entry-subtitle { font-style: italic; font-size: 9pt; color: var(--muted); }
 
   ul.bullets {
-    margin-top: 3px;
-    padding-left: 16px;
-    list-style-type: disc;
+    margin-top: 4px;
+    padding-left: 0;
+    list-style: none;
   }
   ul.bullets li {
-    font-size: 9.5pt;
-    line-height: 1.4;
-    margin-bottom: 2px;
+    font-size: 9.6pt;
+    line-height: 1.42;
+    margin-bottom: 3px;
+    padding-left: 14px;
+    position: relative;
+  }
+  ul.bullets li::before {
+    content: "\2013";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
   }
 
-  .flat-list { font-size: 9.5pt; line-height: 1.6; }
+  .flat-list { font-size: 9.6pt; line-height: 1.65; }
   .flat-item { margin-bottom: 2px; }
+  .flat-item .group-label { font-weight: 700; }
 
   @media print {
-    body { padding: 1.2cm; }
-    a { color: #1a1a1a !important; text-decoration: none !important; }
+    body { padding: 1.1cm 1.4cm; }
+    a { color: var(--text) !important; text-decoration: none !important; }
   }
 </style>
 </head>
 <body>
 
 <div class="header">
-  {% if photo_url %}<img class="header-photo" src="{{ photo_url }}" alt="Photo">{% endif %}
   <div class="header-text">
-  <h1>{{ candidate_name }}</h1>
-  <div class="contact-line">
-    {%- set ns = namespace(first=true) -%}
-    {%- macro sep() %}{%- if not ns.first %}<span class="sep">|</span>{%- endif %}{%- set ns.first = false -%}{%- endmacro -%}
-    {%- if phone %}{{ sep() }}<span>{{ phone }}</span>{% set ns.first = false %}{% endif -%}
-    {%- if email %}{{ sep() }}<a href="mailto:{{ email }}">{{ email }}</a>{% set ns.first = false %}{% endif -%}
-    {%- if linkedin %}{{ sep() }}<a href="{{ linkedin }}">{{ linkedin | replace('https://','') | replace('http://','') }}</a>{% set ns.first = false %}{% endif -%}
-    {%- if github %}{{ sep() }}<a href="{{ github }}">{{ github | replace('https://','') | replace('http://','') }}</a>{% set ns.first = false %}{% endif -%}
-    {%- if website and website != linkedin and website != github %}{{ sep() }}<a href="{{ website }}">{{ website | replace('https://','') | replace('http://','') }}</a>{% endif -%}
+    <h1>{{ candidate_name }}</h1>
+    {% if target_role %}<div class="target-role">{{ target_role }}</div>{% endif %}
+    <div class="contact-line">
+      {%- set ns = namespace(first=true) -%}
+      {%- macro sep() %}{%- if not ns.first %}<span class="sep">|</span>{%- endif %}{%- set ns.first = false -%}{%- endmacro -%}
+      {%- if phone %}{{ sep() }}<span>{{ phone }}</span>{% endif -%}
+      {%- if email %}{{ sep() }}<a href="mailto:{{ email }}">{{ email }}</a>{% endif -%}
+      {%- if linkedin %}{{ sep() }}<a href="{{ linkedin }}">{{ linkedin | replace('https://','') | replace('http://','') }}</a>{% endif -%}
+      {%- if github %}{{ sep() }}<a href="{{ github }}">{{ github | replace('https://','') | replace('http://','') }}</a>{% endif -%}
+      {%- if website and website != linkedin and website != github %}{{ sep() }}<a href="{{ website }}">{{ website | replace('https://','') | replace('http://','') }}</a>{% endif -%}
+    </div>
   </div>
-  </div>
+  {% if photo_url %}<img class="header-photo" src="{{ photo_url }}" alt="Photo">{% endif %}
 </div>
 
 {% if professional_summary %}
 <section class="summary">
-  <h2>{% if lang == 'de' %}Zusammenfassung{% elif lang == 'fr' %}Résumé professionnel{% else %}Summary{% endif %}</h2>
+  <h2>{% if lang == 'de' %}Profil{% elif lang == 'fr' %}Profil{% else %}Summary{% endif %}</h2>
   <p>{{ professional_summary }}</p>
 </section>
 {% endif %}
@@ -153,7 +177,14 @@
     </ul>
     {% endif %}
     {% if not item.bullets and item.description %}
-    <p style="font-size:9.5pt;margin-top:2px;">{{ item.description }}</p>
+    <p style="font-size:9.6pt;margin-top:3px;color:var(--text);">{{ item.description }}</p>
+    {% endif %}
+    {% if item.item_type == 'skill_group' and item.metadata %}
+    <div class="flat-list">
+      {% for group, skills in item.metadata.items() %}
+      <div class="flat-item"><span class="group-label">{{ group }}:</span> {{ skills | join(', ') }}</div>
+      {% endfor %}
+    </div>
     {% endif %}
   </div>
   {% endfor %}

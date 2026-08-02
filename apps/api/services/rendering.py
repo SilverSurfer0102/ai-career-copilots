@@ -3,6 +3,7 @@ import copy
 import json
 import logging
 import os
+import re
 from datetime import date
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -39,7 +40,7 @@ def _photo_data_url(photo_path: str) -> str | None:
         return None
 
 
-def render_resume_html(run, profile=None) -> str:
+def render_resume_html(run, profile=None, theme: str = "modern") -> str:
     outputs = run.generation_outputs or {}
     template = _jinja_env.get_template("resume.html.j2")
 
@@ -60,7 +61,7 @@ def render_resume_html(run, profile=None) -> str:
             photo_url = _photo_data_url(profile.photo_path) or ""
 
     gen_inputs = run.generation_inputs or {}
-    lang = gen_inputs.get("options", {}).get("language_override") or "en"
+    lang = gen_inputs.get("options", {}).get("language_override") or "de"
 
     return template.render(
         candidate_name=outputs.get("candidate_name", "") or (profile.display_name if profile else ""),
@@ -74,7 +75,21 @@ def render_resume_html(run, profile=None) -> str:
         professional_summary=summary_text,
         sections=sections,
         lang=lang,
+        theme=theme if theme in ("modern", "classic") else "modern",
     )
+
+
+_GERMAN_MONTHS = [
+    "Januar", "Februar", "März", "April", "Mai", "Juni",
+    "Juli", "August", "September", "Oktober", "November", "Dezember",
+]
+
+
+def _format_date(lang: str) -> str:
+    today = date.today()
+    if lang == "de":
+        return f"{today.day}. {_GERMAN_MONTHS[today.month - 1]} {today.year}"
+    return today.strftime("%B %d, %Y")
 
 
 def render_cover_letter_html(run, profile=None) -> str:
@@ -84,20 +99,42 @@ def render_cover_letter_html(run, profile=None) -> str:
     paragraphs = _parse_json_field(outputs.get("paragraphs", []), [])
 
     candidate_name = ""
+    contact = ""
     if profile:
         candidate_name = profile.display_name or ""
+        contact_parts = [p for p in (profile.email, profile.phone, profile.location) if p]
+        contact = " · ".join(contact_parts)
+
+    gen_inputs = run.generation_inputs or {}
+    lang = gen_inputs.get("options", {}).get("language_override") or "de"
 
     return template.render(
         candidate_name=candidate_name,
-        contact="",
-        date=date.today().strftime("%B %d, %Y"),
+        contact=contact,
+        date=_format_date(lang),
         recipient_name=outputs.get("recipient_name"),
         company_name=outputs.get("company_name", ""),
         position_title=outputs.get("position_title", ""),
+        opening_salutation=outputs.get("opening_salutation", ""),
         paragraphs=paragraphs,
-        closing_salutation=outputs.get("closing_salutation", "Sincerely"),
-        lang="en",
+        closing_salutation=outputs.get("closing_salutation", "Mit freundlichen Grüßen" if lang == "de" else "Sincerely"),
+        lang=lang,
     )
+
+
+_UMLAUT_MAP = str.maketrans({
+    "ä": "ae", "ö": "oe", "ü": "ue", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss",
+})
+
+
+def sanitize_filename(name: str, fallback: str = "Unbenannt") -> str:
+    """Transliterates umlauts and strips anything that isn't safe across
+    Windows/macOS/Linux filesystems and older unzip tools — application
+    portals routinely reject uploads with special characters in the name."""
+    name = (name or "").translate(_UMLAUT_MAP)
+    name = re.sub(r"[^A-Za-z0-9 _-]", "", name).strip()
+    name = re.sub(r"\s+", "_", name)
+    return name or fallback
 
 
 def render_pdf(html: str) -> bytes:

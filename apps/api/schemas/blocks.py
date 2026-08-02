@@ -251,3 +251,53 @@ class AchievementRead(BaseModel):
     metric_value: Optional[str] = None
     created_at: datetime
     model_config = {"from_attributes": True}
+
+
+# ── Content Block ────────────────────────────────────────────────────────────
+
+class ContentBlockCreate(BaseModel):
+    parent_type: str
+    parent_id: Optional[str] = None
+    kind: str
+    text: str
+    variant_label: Optional[str] = None
+    role_tags: list = []
+    keywords: list = []
+    language: str = "de"
+    priority: int = 0
+    approved: bool = False
+
+    _coerce_tags = field_validator("role_tags", "keywords", mode="before")(_coerce_list)
+
+
+class ContentBlockUpdate(BaseModel):
+    parent_type: Optional[str] = None
+    parent_id: Optional[str] = None
+    kind: Optional[str] = None
+    text: Optional[str] = None
+    variant_label: Optional[str] = None
+    role_tags: Optional[list] = None
+    keywords: Optional[list] = None
+    language: Optional[str] = None
+    priority: Optional[int] = None
+    approved: Optional[bool] = None
+
+    _coerce_tags = field_validator("role_tags", "keywords", mode="before")(_coerce_list)
+
+
+class ContentBlockRead(BaseModel):
+    id: str
+    profile_id: str
+    parent_type: str
+    parent_id: Optional[str] = None
+    kind: str
+    text: str
+    variant_label: Optional[str] = None
+    role_tags: list = []
+    keywords: list = []
+    language: str = "de"
+    priority: int = 0
+    approved: bool = False
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}

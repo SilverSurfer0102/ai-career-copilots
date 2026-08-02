@@ -1,45 +1,51 @@
 # AI Career Copilots — CLAUDE.md
 
 ## Was ist dieses Projekt?
-Evidence-grounded Bewerbungsassistent. Nutzer lädt Karrieredokumente hoch (CV, Studienhandbuch, Paper, Zertifikat) oder schreibt Freitext. Claude extrahiert strukturierte Daten (Erfahrungen, Projekte, Skills, Ausbildung, Publikationen, Zertifikate). Für einen Job-Description generiert das System Resume + Anschreiben + Match-Analyse, bei der jede Aussage auf eine Evidence-ID im Profil zurückführbar ist. Anschließend läuft eine Validierungs-Pipeline, die unbelegte Behauptungen flaggt. Export aktuell als HTML + PDF (weasyprint).
+Evidence-grounded Bewerbungsassistent. Nutzer lädt Karrieredokumente hoch (CV, Studienhandbuch, Paper, Zertifikat) oder schreibt Freitext. Claude extrahiert strukturierte Daten (Erfahrungen, Projekte, Skills, Ausbildung, Publikationen, Zertifikate). Der Nutzer formuliert daraus Textbausteine und gibt sie frei. Für eine Job-Description *wählt* Claude nur noch passende Bausteine aus (Selektions-Pipeline) statt Text neu zu generieren — der einzige echte Freitext ist ein kurzer, firmenspezifischer Anschreiben-Hook. Ein deterministischer Pre-Flight-Check läuft vor jedem Export. Export als HTML + PDF (weasyprint), optional `.tex` (manuell kompilierbar).
+
+Details zur Architekturentscheidung: [docs/PLAN-v2-bausteinsystem.md](docs/PLAN-v2-bausteinsystem.md).
 
 ## Aktueller Stand (ehrlich)
 **Läuft:**
-- Backend (FastAPI + SQLModel + SQLite) + Frontend (Next.js 14 + Tailwind + shadcn/ui) lokal startbar
-- 12 DB-Modelle, alle Pipelines implementiert, Freitext-Eingabe
-- Multi-File-Upload + native Claude Vision für gescannte PDFs (heute hinzugefügt)
-- 4 UI-Seiten: profile, jobs, review, workspace
+- Backend (FastAPI + SQLModel + SQLite) + Frontend (Next.js + Tailwind + shadcn/ui) lokal startbar
+- Bausteinsystem (`ContentBlock`): Bootstrap aus vorhandenen Daten, Freigabe-Workflow, Selektions-Pipeline für Resume + Anschreiben
+- Pre-Flight-Check (deterministisch, kein LLM-Call) + Diff-Review gegen den Baustein-Pool
+- Stellen-Feed: Bundesagentur-für-Arbeit-API + manuelles Einfügen (Paste), Swipe-UI unter `/swipe`
+- Batch-Export als ZIP mit einem Ordner pro Firma
+- Strukturierte manuelle Eingabe/Bearbeitung im Profil (Erfahrungen, Skills, Kontaktdaten, Section-Reihenfolge)
+- Multi-File-Upload + native Claude Vision für gescannte PDFs
 
 **Lücken:**
-- Profile-Seite: **keine strukturierte manuelle Eingabe** für Erfahrungen/Projekte/Skills — nur Upload oder Freitext. Extrahierte Daten können **nicht editiert** werden.
-- Workspace: User muss Profile-ID + Job-ID als Copy-Paste eintragen (schlechter UX).
-- Semantic/Vector-Retrieval ist Stub → nur Keyword-Scoring.
-- **LaTeX-Export fehlt komplett** (ist User-Ziel #2).
-- DOCX-Export fehlt.
-- Keine Auth, Single-User only.
-- Noch nie echt end-to-end mit realen Daten getestet.
+- Semantic/Vector-Retrieval ist Stub → nur Keyword-Scoring (bewusst, siehe Plan-Dokument)
+- LaTeX-Export liefert nur `.tex`-Quelltext — keine TeX-Distribution installiert, PDF-Pfad läuft über HTML/weasyprint
+- DOCX-Export fehlt
+- Keine Auth, Single-User only
+- Kein automatischer Bewerbungsversand (bewusst — Bewerbungen laufen über Firmenportale)
 
 ## Projektstruktur
 ```
 apps/api/                FastAPI Backend
-  prompts/               Prompt-Templates (ingestion, generation, validation)
+  prompts/               Prompt-Templates (ingestion, selection, job_analysis)
   services/              Business Logic
-    generation/          resume.py, cover_letter.py, match_analysis.py
+    generation/          resume.py, cover_letter.py, match_analysis.py (Selektions-Pipeline)
+    sources/             bundesagentur.py (Job-Feed)
     parsers/             pdf_parser, docx_parser, text_parser, dispatcher
     ai_client.py         Claude SDK wrapper (structured/free/with_pdf)
     ingestion.py         Doc → structured data pipeline
     retrieval.py         Evidence pack builder (keyword scoring)
     rendering.py         HTML/PDF rendering via weasyprint
-  routers/               profiles, jobs, retrieval, generate, validate, export
+    preflight.py         Deterministischer Pre-Export-Check
+    diff_review.py        Diff generierter Bullets vs. Baustein-Pool
+  routers/               profiles, blocks, jobs, leads, retrieval, generate, validate, preflight, export, applications
   schemas/               Pydantic Schemas
-  models.py              SQLModel DB-Models
+  models.py              SQLModel DB-Models (inkl. ContentBlock, JobLead)
   main.py                API-Einstiegspunkt
   alembic/               DB-Migrationen
-apps/web/                Next.js 14 App Router
-  app/                   Pages: profile, jobs, review, workspace
+apps/web/                Next.js App Router
+  app/                   Pages: profile, swipe, jobs, applications, review, pool-cv
   components/ui/         shadcn/ui Components
   lib/api.ts             Typed API client
-docs/                    architecture, prompting, security-privacy
+docs/                    architecture, prompting, security-privacy, PLAN-v2-bausteinsystem
 scripts/                 seed_demo_data.py
 ```
 
@@ -63,9 +69,9 @@ npm run dev
 .env muss in `apps/api/.env` mit gültigem `ANTHROPIC_API_KEY` liegen.
 
 ## Meine Ziele (Priorität)
-1. **Nutzerfreundliches Profil-Setup** — strukturierte Eingabe + Editierbarkeit aller Career-Daten (Erfahrungen, Skills, Projekte, Ausbildung). Aktuell größte UX-Lücke.
-2. **LaTeX-Ausgabe** — CV + Anschreiben auf Deutsch als LaTeX mit 3 Template-Varianten (modern, klassisch, akademisch). DIN 5008, Umlaute-Support.
-3. **Saubere Generierungs-Pipeline** — kein Halluzinieren, nur Fakten aus dem Profil. Die Anti-Halluzinations-Logik existiert, muss aber mit echten Daten verifiziert werden.
+1. **Bausteinsystem mit echten Daten befüllen** — Bootstrap laufen lassen, Bausteine in eigener Sprache formulieren und freigeben. Größter Hebel für Qualität, einmaliger Aufwand.
+2. **Swipe-Feed im Alltag nutzen** — Bundesagentur-Suchprofile einrichten, Paste-Workflow für LinkedIn/Stepstone etablieren.
+3. **LaTeX optional vertiefen** — aktuell Zusatzformat (`.tex`, manuell kompilierbar). Nur ausbauen, wenn eine TeX-Distribution lokal installiert wird — Haupt-PDF-Pfad bleibt HTML/weasyprint.
 
 ## Kosten-Tracking
 Token-Verbrauch transparent halten:

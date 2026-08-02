@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
+  { href: "/swipe", label: "Stellen-Feed" },
   { href: "/applications", label: "Bewerbungen" },
   { href: "/profile", label: "Profil" },
   { href: "/pool-cv", label: "Pool-CV" },

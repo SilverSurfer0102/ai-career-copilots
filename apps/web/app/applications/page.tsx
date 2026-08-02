@@ -39,16 +39,29 @@ function StatusBadge({ status }: { status: ApplicationStatus }) {
   );
 }
 
-function AppCard({ app, onClick }: { app: Application; onClick: () => void }) {
+function AppCard({
+  app, onClick, selected, onToggleSelect,
+}: {
+  app: Application; onClick: () => void; selected: boolean; onToggleSelect: () => void;
+}) {
   return (
     <div
       onClick={onClick}
-      className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all"
+      className={`bg-card border rounded-xl p-4 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all ${selected ? "border-primary ring-1 ring-primary/40" : "border-border"}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-semibold text-sm truncate">{app.job_title || "Unbekannte Stelle"}</p>
-          <p className="text-muted-foreground text-xs mt-0.5">{app.job_company || "Unbekannte Firma"}</p>
+        <div className="min-w-0 flex items-start gap-2">
+          <input
+            type="checkbox"
+            checked={selected}
+            onClick={(e) => e.stopPropagation()}
+            onChange={onToggleSelect}
+            className="mt-1 shrink-0"
+          />
+          <div className="min-w-0">
+            <p className="font-semibold text-sm truncate">{app.job_title || "Unbekannte Stelle"}</p>
+            <p className="text-muted-foreground text-xs mt-0.5">{app.job_company || "Unbekannte Firma"}</p>
+          </div>
         </div>
         <StatusBadge status={app.status as ApplicationStatus} />
       </div>
@@ -68,6 +81,42 @@ export default function ApplicationsPage() {
   const [apps, setApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBatchExport = async () => {
+    if (selected.size === 0) return;
+    setExporting(true);
+    try {
+      const { blob, skipped } = await api.export.batchExportZip(Array.from(selected));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "bewerbungen.zip";
+      a.click();
+      URL.revokeObjectURL(url);
+      if (skipped.length > 0) {
+        toast.warning(`${skipped.length} Bewerbung(en) übersprungen`, {
+          description: skipped.map((s) => s.reason).join(" · "),
+        });
+      } else {
+        toast.success("Export fertig");
+      }
+      setSelected(new Set());
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     api.applications.list()
@@ -100,9 +149,16 @@ export default function ApplicationsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-3xl font-serif font-semibold">Bewerbungen</h1>
-        <Button onClick={() => router.push("/applications/new")}>
-          + Neue Bewerbung
-        </Button>
+        <div className="flex gap-2">
+          {selected.size > 0 && (
+            <Button variant="outline" onClick={handleBatchExport} disabled={exporting}>
+              {exporting ? "Exportiere…" : `${selected.size} exportieren`}
+            </Button>
+          )}
+          <Button onClick={() => router.push("/applications/new")}>
+            + Neue Bewerbung
+          </Button>
+        </div>
       </div>
 
       <div className="w-full max-w-sm">
@@ -143,6 +199,8 @@ export default function ApplicationsPage() {
                     key={app.id}
                     app={app}
                     onClick={() => router.push(`/applications/${app.id}`)}
+                    selected={selected.has(app.id)}
+                    onToggleSelect={() => toggleSelect(app.id)}
                   />
                 ))}
               </div>

@@ -33,3 +33,13 @@ apps/api/.venv/
 apps/web/.next/
 apps/web/node_modules/
 START.txt
+
+# SQLite (local dev DB — never commit real user data)
+*.db
+*.db-shm
+*.db-wal
+
+# Uploaded documents / generated exports
+apps/api/uploads/
+*.egg-info/
+resume_*.pdf

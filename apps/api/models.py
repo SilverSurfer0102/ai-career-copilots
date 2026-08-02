@@ -186,6 +186,34 @@ class Achievement(SQLModel, table=True):
     model_config = {"arbitrary_types_allowed": True}
 
 
+class ContentBlock(SQLModel, table=True):
+    """A user-authored, pre-approved text block (bullet, summary, letter fragment).
+
+    The generation pipeline only ever *selects* among approved blocks — it never
+    writes this text itself. This is what keeps generated documents grounded and
+    in the candidate's own voice instead of freshly written LLM prose.
+    """
+
+    __tablename__ = "content_block"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    profile_id: str = Field(foreign_key="candidate_profile.id", index=True)
+    parent_type: str  # "experience" | "project" | "education" | "standalone"
+    parent_id: Optional[str] = None
+    kind: str  # "bullet" | "summary" | "letter_intro" | "letter_close"
+    text: str
+    variant_label: Optional[str] = None  # e.g. "kurz" | "lang" | "technisch"
+    role_tags: list = Field(default_factory=list, sa_column=Column(JSON))
+    keywords: list = Field(default_factory=list, sa_column=Column(JSON))
+    language: str = "de"
+    priority: int = 0
+    approved: bool = False
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
 class JobDescription(SQLModel, table=True):
     __tablename__ = "job_description"
 
@@ -208,6 +236,31 @@ class JobDescription(SQLModel, table=True):
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
+
+
+class JobLead(SQLModel, table=True):
+    """A candidate job posting sitting in the swipe queue, before it becomes a
+    full JobDescription. Sourced from the Bundesagentur API or pasted manually
+    (e.g. via the browser bookmarklet) — never scraped from LinkedIn/Stepstone,
+    which would violate their terms of service."""
+
+    __tablename__ = "job_lead"
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    source: str  # "bundesagentur" | "paste"
+    external_id: Optional[str] = None
+    title: str
+    company: Optional[str] = None
+    location: Optional[str] = None
+    url: Optional[str] = None
+    raw_text: str = ""
+    posted_at: Optional[str] = None
+    status: str = "new"  # "new" | "liked" | "passed" | "applied"
+    score: Optional[float] = None
+    dedupe_hash: str = Field(index=True)
+    created_at: datetime = Field(default_factory=_now)
+
+    model_config = {"arbitrary_types_allowed": True}
 
 
 class Application(SQLModel, table=True):

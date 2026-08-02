@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from database import get_session
 from models import (
     CandidateProfile, Experience, Project, Skill, LanguageSkill,
-    Education, Certification, Achievement,
+    Education, Certification, Achievement, ContentBlock,
 )
 from schemas.blocks import (
     ExperienceCreate, ExperienceUpdate, ExperienceRead,
@@ -14,6 +15,7 @@ from schemas.blocks import (
     LanguageCreate, LanguageUpdate, LanguageRead,
     CertificationCreate, CertificationUpdate, CertificationRead,
     AchievementCreate, AchievementUpdate, AchievementRead,
+    ContentBlockCreate, ContentBlockUpdate, ContentBlockRead,
 )
 
 router = APIRouter()
@@ -304,3 +306,119 @@ def delete_achievement(
         raise HTTPException(status_code=404, detail="Not found")
     session.delete(obj)
     session.commit()
+
+
+# ── Content Block ────────────────────────────────────────────────────────────
+
+@router.get("/{profile_id}/content-blocks", response_model=list[ContentBlockRead])
+def list_content_blocks(
+    profile_id: str,
+    approved: bool | None = Query(default=None),
+    kind: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+):
+    _get_profile(profile_id, session)
+    stmt = select(ContentBlock).where(ContentBlock.profile_id == profile_id)
+    if approved is not None:
+        stmt = stmt.where(ContentBlock.approved == approved)
+    if kind is not None:
+        stmt = stmt.where(ContentBlock.kind == kind)
+    return session.exec(stmt.order_by(ContentBlock.parent_id, ContentBlock.priority)).all()
+
+
+@router.post("/{profile_id}/content-blocks", response_model=ContentBlockRead, status_code=201)
+def create_content_block(
+    profile_id: str, payload: ContentBlockCreate, session: Session = Depends(get_session)
+):
+    _get_profile(profile_id, session)
+    obj = ContentBlock(profile_id=profile_id, **payload.model_dump())
+    session.add(obj)
+    session.commit()
+    session.refresh(obj)
+    return obj
+
+
+@router.patch("/{profile_id}/content-blocks/{block_id}", response_model=ContentBlockRead)
+def update_content_block(
+    profile_id: str, block_id: str, payload: ContentBlockUpdate, session: Session = Depends(get_session)
+):
+    obj = session.get(ContentBlock, block_id)
+    if not obj or obj.profile_id != profile_id:
+        raise HTTPException(status_code=404, detail="Not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(obj, k, v)
+    obj.updated_at = datetime.utcnow()
+    session.add(obj)
+    session.commit()
+    session.refresh(obj)
+    return obj
+
+
+@router.delete("/{profile_id}/content-blocks/{block_id}", status_code=204)
+def delete_content_block(
+    profile_id: str, block_id: str, session: Session = Depends(get_session)
+):
+    obj = session.get(ContentBlock, block_id)
+    if not obj or obj.profile_id != profile_id:
+        raise HTTPException(status_code=404, detail="Not found")
+    session.delete(obj)
+    session.commit()
+
+
+@router.post("/{profile_id}/content-blocks/bootstrap", response_model=list[ContentBlockRead])
+def bootstrap_content_blocks(profile_id: str, session: Session = Depends(get_session)):
+    """One-time migration helper: turns existing free-text bullets/summaries into
+    draft (unapproved) ContentBlocks so the candidate can review and approve them
+    instead of starting from a blank page. Skips parents that already have blocks."""
+    profile = _get_profile(profile_id, session)
+    existing_parent_ids = {
+        b.parent_id
+        for b in session.exec(
+            select(ContentBlock).where(ContentBlock.profile_id == profile_id)
+        ).all()
+    }
+    created: list[ContentBlock] = []
+
+    experiences = session.exec(select(Experience).where(Experience.profile_id == profile_id)).all()
+    for exp in experiences:
+        if exp.id in existing_parent_ids:
+            continue
+        for i, bullet in enumerate(exp.bullets or []):
+            text = bullet.get("text") if isinstance(bullet, dict) else bullet
+            if not text:
+                continue
+            created.append(ContentBlock(
+                profile_id=profile_id, parent_type="experience", parent_id=exp.id,
+                kind="bullet", text=text, priority=i, role_tags=exp.domain_tags or [],
+                keywords=exp.tech_stack or [], approved=False,
+            ))
+
+    projects = session.exec(select(Project).where(Project.profile_id == profile_id)).all()
+    for proj in projects:
+        if proj.id in existing_parent_ids:
+            continue
+        for i, bullet in enumerate(proj.bullets or []):
+            text = bullet.get("text") if isinstance(bullet, dict) else bullet
+            if not text:
+                continue
+            created.append(ContentBlock(
+                profile_id=profile_id, parent_type="project", parent_id=proj.id,
+                kind="bullet", text=text, priority=i, keywords=proj.technologies or [],
+                approved=False,
+            ))
+
+    if "standalone" not in existing_parent_ids:
+        for i, summary in enumerate(profile.summary_variants or []):
+            if not summary:
+                continue
+            created.append(ContentBlock(
+                profile_id=profile_id, parent_type="standalone", parent_id=None,
+                kind="summary", text=summary, priority=i, approved=False,
+            ))
+
+    for obj in created:
+        session.add(obj)
+    session.commit()
+    for obj in created:
+        session.refresh(obj)
+    return created
