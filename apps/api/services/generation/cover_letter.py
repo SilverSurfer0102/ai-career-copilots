@@ -71,7 +71,7 @@ async def generate_cover_letter(payload: GenerationRequest, session: Session) ->
     used_block_ids = [
         b for b in [selection.get("intro_block_id"), selection.get("close_block_id")]
         if b
-    ] + [b for b in (selection.get("achievement_block_ids") or [])]
+    ] + [b for b in (selection.get("hook_evidence_ids") or [])]
 
     run = GenerationRun(
         profile_id=payload.profile_id,
@@ -110,13 +110,11 @@ def _assemble_letter_output(job, lang, selection, intro_candidates, close_candid
     close_text = close_by_id[close_id].text if close_id in close_by_id else _FALLBACK_CLOSE.get(lang, _FALLBACK_CLOSE["en"])
 
     hook_text = selection.get("hook") or ""
+    hook_evidence_ids = [eid for eid in (selection.get("hook_evidence_ids") or []) if eid in achievement_by_id]
 
     paragraphs = [{"text": intro_text, "paragraph_type": "opening", "evidence_ids": [intro_id] if intro_id in intro_by_id else []}]
     if hook_text:
-        paragraphs.append({"text": hook_text, "paragraph_type": "motivation", "evidence_ids": []})
-    for aid in selection.get("achievement_block_ids") or []:
-        if aid in achievement_by_id:
-            paragraphs.append({"text": achievement_by_id[aid].text, "paragraph_type": "experience", "evidence_ids": [aid]})
+        paragraphs.append({"text": hook_text, "paragraph_type": "motivation", "evidence_ids": hook_evidence_ids})
     paragraphs.append({"text": close_text, "paragraph_type": "closing", "evidence_ids": [close_id] if close_id in close_by_id else []})
 
     recipient_name = None  # no per-application contact tracking yet — always the generic salutation
