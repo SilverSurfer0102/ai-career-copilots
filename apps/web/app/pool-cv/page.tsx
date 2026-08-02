@@ -21,10 +21,12 @@ export default function PoolCVPage() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    api.profiles.list().then((ps) => {
-      setProfiles(ps);
-      if (ps.length > 0) setSelectedProfileId(ps[0].id);
-    });
+    api.profiles.list()
+      .then((ps) => {
+        setProfiles(ps);
+        if (ps.length > 0) setSelectedProfileId(ps[0].id);
+      })
+      .catch(() => toast.error("Profile konnten nicht geladen werden — läuft das Backend?"));
   }, []);
 
   const loadPoolRun = useCallback(async (profileId: string) => {

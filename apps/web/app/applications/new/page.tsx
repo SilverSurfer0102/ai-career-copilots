@@ -23,12 +23,14 @@ export default function NewApplicationPage() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.profiles.list(), api.jobs.list()]).then(([p, j]) => {
-      setProfiles(p);
-      setJobs(j);
-      if (p.length > 0) setProfileId(p[0].id);
-      if (j.length > 0) setSelectedJobId(j[0].id);
-    });
+    Promise.all([api.profiles.list(), api.jobs.list()])
+      .then(([p, j]) => {
+        setProfiles(p);
+        setJobs(j);
+        if (p.length > 0) setProfileId(p[0].id);
+        if (j.length > 0) setSelectedJobId(j[0].id);
+      })
+      .catch(() => toast.error("Daten konnten nicht geladen werden — läuft das Backend?"));
   }, []);
 
   const handleCreate = async () => {

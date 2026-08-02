@@ -37,15 +37,20 @@ export default function SwipePage() {
   const [pasting, setPasting] = useState(false);
 
   useEffect(() => {
-    api.profiles.list().then((ps) => {
-      setProfiles(ps);
-      if (ps.length > 0) setSelectedProfileId(ps[0].id);
-    });
+    api.profiles.list()
+      .then((ps) => {
+        setProfiles(ps);
+        if (ps.length > 0) setSelectedProfileId(ps[0].id);
+      })
+      .catch(() => toast.error("Profile konnten nicht geladen werden — läuft das Backend?"));
   }, []);
 
   const loadQueue = useCallback(() => {
     setLoadingQueue(true);
-    api.leads.list("new").then(setQueue).finally(() => setLoadingQueue(false));
+    api.leads.list("new")
+      .then(setQueue)
+      .catch(() => toast.error("Stellen-Feed konnte nicht geladen werden — läuft das Backend?"))
+      .finally(() => setLoadingQueue(false));
   }, []);
 
   useEffect(() => { loadQueue(); }, [loadQueue]);

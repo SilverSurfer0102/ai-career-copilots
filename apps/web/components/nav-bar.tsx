@@ -7,7 +7,6 @@ const links = [
   { href: "/applications", label: "Bewerbungen" },
   { href: "/profile", label: "Profil" },
   { href: "/pool-cv", label: "Pool-CV" },
-  { href: "/jobs", label: "Jobs" },
 ];
 
 export function NavBar() {
