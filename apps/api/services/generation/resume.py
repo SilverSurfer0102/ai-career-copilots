@@ -175,7 +175,15 @@ def _assemble_resume_output(
             })
         sections.append({"section_type": "experience", "title": _section_title("experience", lang), "items": items})
 
-    relevant_projects = [p for p in projects if p.id in included_project_ids] or []
+    relevant_projects = [p for p in projects if p.id in included_project_ids]
+    min_projects = min(2, len(projects))
+    if len(relevant_projects) < min_projects and len(experiences) <= 2:
+        # Safety net: for a candidate with little work history, projects are the
+        # main evidence of skill — an empty/thin projects section is worse than
+        # including the best-available ones even on an imperfect match. The LLM
+        # was told this explicitly (SELECTION_SYSTEM rule 5); this is the
+        # deterministic backstop in case it under-selects anyway.
+        relevant_projects = projects[:3]
     if relevant_projects:
         items = []
         for p in relevant_projects:
@@ -210,9 +218,13 @@ def _assemble_resume_output(
     valid_skill_ids = {s.id for s in skills}
     selected_skills = [s for s in skills if s.id in included_skill_ids & valid_skill_ids] or skills
     if selected_skills:
+        group_labels = _SKILL_GROUP_LABELS_DE if lang == "de" else _SKILL_GROUP_LABELS_EN
+        fallback_group = "Sonstige" if lang == "de" else "Other"
         by_cat: dict = defaultdict(list)
         for s in selected_skills:
-            by_cat[s.category or "Sonstige"].append(s.name)
+            group = group_labels.get((s.category or "").lower(), fallback_group)
+            if s.name not in by_cat[group]:
+                by_cat[group].append(s.name)
         sections.append({
             "section_type": "skills",
             "title": _section_title("skills", lang),
@@ -306,6 +318,21 @@ def _extract_used_block_ids(result: dict) -> list[str]:
             for bullet in item.get("bullets", []):
                 ids.update(bullet.get("evidence_ids") or [])
     return list(ids)
+
+
+# Merges the underlying Skill.category values into fewer, recruiter-facing
+# groups. Internal categories stay fine-grained (useful for the LLM's
+# selection reasoning) — this only affects how they're grouped on the page.
+_SKILL_GROUP_LABELS_DE = {
+    "technical": "Programmiersprachen & Tools", "framework": "Programmiersprachen & Tools",
+    "tool": "Programmiersprachen & Tools", "domain": "Fachwissen", "soft": "Soft Skills",
+    "methoden": "Methoden", "language": "Programmiersprachen & Tools",
+}
+_SKILL_GROUP_LABELS_EN = {
+    "technical": "Languages & Tools", "framework": "Languages & Tools",
+    "tool": "Languages & Tools", "domain": "Domain Knowledge", "soft": "Soft Skills",
+    "methoden": "Methods", "language": "Languages & Tools",
+}
 
 
 _SECTION_TITLES = {

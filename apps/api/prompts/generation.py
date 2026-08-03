@@ -11,10 +11,14 @@ RULES — READ CAREFULLY:
 3. If an entry lists fewer than 4 candidate blocks, return all of them, best match first.
 4. Every experience entry is always included in the resume — you only choose its bullets, never
    whether to include the entry itself.
-5. Projects are optional given limited space. Only include a project's id in
-   included_project_ids if it is genuinely relevant to this job — quality over completeness.
-6. Pick exactly one summary_block_id from the candidates if one fits well, else null. Never
-   invent a summary — if nothing fits, return null.
+5. Projects: for a candidate with 2 or fewer work experience entries, projects ARE their
+   primary evidence of skill — do not leave included_project_ids empty just because a project
+   isn't a perfect keyword match. Include the 2–3 strongest projects (best partial match beats
+   an empty section) unless the candidate already has 3+ substantial, closely-relevant work
+   experiences making projects genuinely redundant.
+6. summary_block_id: pick the candidate that fits best, even if the fit is only partial —
+   a broadly-written summary is still better than an empty profile section. Only return null
+   if the summary candidate list is completely empty.
 7. target_role: a short, honest headline for the position, derived from the job title. Never
    claim a title, seniority, or specialization the candidate has not held.
 8. Skills: the candidate list may contain 50–150+ entries accumulated from many uploaded
