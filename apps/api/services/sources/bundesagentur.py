@@ -10,6 +10,7 @@ import base64
 import hashlib
 import logging
 import re
+from datetime import date
 
 import httpx
 
@@ -41,6 +42,19 @@ def is_senior_title(title: str) -> bool:
     if _JUNIOR_OVERRIDE_PATTERN.search(title):
         return False
     return bool(_SENIOR_TITLE_PATTERN.search(title))
+
+
+def is_stale_posting(posted_at: str | None, max_age_weeks: int | None) -> bool:
+    """Many Bundesagentur postings sit online long after the role is filled —
+    employers rarely bother taking them down. A posting significantly older
+    than a few weeks is a real signal the role may already be gone."""
+    if not max_age_weeks or not posted_at:
+        return False
+    try:
+        posted = date.fromisoformat(posted_at)
+    except ValueError:
+        return False
+    return (date.today() - posted).days > max_age_weeks * 7
 
 
 def dedupe_hash(company: str | None, title: str, location: str | None) -> str:
@@ -79,6 +93,7 @@ async def search_jobs(query: str, location: str = "", radius_km: int = 25, size:
             "location": location_str,
             "url": entry.get("externeUrl"),
             "posted_at": entry.get("aktuelleVeroeffentlichungsdatum"),
+            "starts_at": entry.get("eintrittsdatum"),
             "dedupe_hash": dedupe_hash(company, title, location_str),
         })
     return leads

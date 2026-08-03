@@ -16,6 +16,17 @@ const SOURCE_LABEL: Record<string, string> = {
   paste: "Manuell eingefügt",
 };
 
+function formatAge(dateStr?: string): string | null {
+  if (!dateStr) return null;
+  const posted = new Date(dateStr);
+  if (isNaN(posted.getTime())) return null;
+  const days = Math.floor((Date.now() - posted.getTime()) / 86_400_000);
+  if (days <= 0) return "heute veröffentlicht";
+  if (days === 1) return "vor 1 Tag veröffentlicht";
+  if (days < 14) return `vor ${days} Tagen veröffentlicht`;
+  return `vor ${Math.round(days / 7)} Wochen veröffentlicht`;
+}
+
 export default function SwipePage() {
   const router = useRouter();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -27,6 +38,7 @@ export default function SwipePage() {
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
   const [excludeSenior, setExcludeSenior] = useState(true);
+  const [maxAgeWeeks, setMaxAgeWeeks] = useState("5");
   const [searching, setSearching] = useState(false);
 
   const [pasteText, setPasteText] = useState("");
@@ -107,7 +119,8 @@ export default function SwipePage() {
     if (!query.trim()) { toast.error("Suchbegriff eingeben"); return; }
     setSearching(true);
     try {
-      const created = await api.leads.searchBundesagentur(query.trim(), location.trim(), 25, 25, excludeSenior);
+      const weeks = maxAgeWeeks.trim() ? parseInt(maxAgeWeeks, 10) : null;
+      const created = await api.leads.searchBundesagentur(query.trim(), location.trim(), 25, 25, excludeSenior, weeks);
       toast.success(`${created.length} neue Stelle(n) gefunden`);
       loadQueue();
     } catch (e) {
@@ -173,6 +186,14 @@ export default function SwipePage() {
               <Label htmlFor="loc" className="text-xs">Ort</Label>
               <Input id="loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="z. B. Nürnberg" />
             </div>
+            <div>
+              <Label htmlFor="maxAge" className="text-xs">Nicht älter als (Wochen, leer = kein Limit)</Label>
+              <Input
+                id="maxAge" type="number" min="1" value={maxAgeWeeks}
+                onChange={(e) => setMaxAgeWeeks(e.target.value)}
+                placeholder="5"
+              />
+            </div>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input
                 type="checkbox"
@@ -229,6 +250,10 @@ export default function SwipePage() {
                   <CardTitle className="text-lg">{current.title}</CardTitle>
                   <div className="text-sm text-muted-foreground mt-1">
                     {current.company || "Unbekannte Firma"}{current.location ? ` · ${current.location}` : ""}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 flex gap-2 flex-wrap">
+                    {formatAge(current.posted_at) && <span>{formatAge(current.posted_at)}</span>}
+                    {current.starts_at && <span>· Eintritt: {current.starts_at}</span>}
                   </div>
                 </div>
                 <Badge variant="outline">{SOURCE_LABEL[current.source] || current.source}</Badge>

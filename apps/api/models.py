@@ -255,6 +255,7 @@ class JobLead(SQLModel, table=True):
     url: Optional[str] = None
     raw_text: str = ""
     posted_at: Optional[str] = None
+    starts_at: Optional[str] = None
     status: str = "new"  # "new" | "liked" | "passed" | "applied"
     score: Optional[float] = None
     dedupe_hash: str = Field(index=True)

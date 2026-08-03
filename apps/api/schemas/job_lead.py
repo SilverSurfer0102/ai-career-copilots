@@ -9,6 +9,7 @@ class LeadSearchRequest(BaseModel):
     radius_km: int = 25
     size: int = 25
     exclude_senior: bool = True
+    max_age_weeks: Optional[int] = 5
 
 
 class LeadPasteRequest(BaseModel):
@@ -33,6 +34,7 @@ class JobLeadRead(BaseModel):
     url: Optional[str] = None
     raw_text: str
     posted_at: Optional[str] = None
+    starts_at: Optional[str] = None
     status: str
     score: Optional[float] = None
     created_at: datetime

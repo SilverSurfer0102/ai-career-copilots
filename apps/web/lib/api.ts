@@ -181,10 +181,13 @@ export const api = {
   leads: {
     list: (status: string | null = "new") =>
       apiFetch<JobLead[]>(`/leads${status ? `?status=${status}` : ""}`),
-    searchBundesagentur: (query: string, location: string, radius_km = 25, size = 25, exclude_senior = true) =>
+    searchBundesagentur: (
+      query: string, location: string, radius_km = 25, size = 25,
+      exclude_senior = true, max_age_weeks: number | null = 5
+    ) =>
       apiFetch<JobLead[]>("/leads/search-bundesagentur", {
         method: "POST",
-        body: JSON.stringify({ query, location, radius_km, size, exclude_senior }),
+        body: JSON.stringify({ query, location, radius_km, size, exclude_senior, max_age_weeks }),
       }),
     paste: (data: { url?: string; raw_text: string; title?: string; company?: string; location?: string }) =>
       apiFetch<JobLead>("/leads/paste", { method: "POST", body: JSON.stringify(data) }),
@@ -508,6 +511,7 @@ export interface JobLead {
   url?: string;
   raw_text: string;
   posted_at?: string;
+  starts_at?: string;
   status: string;
   score?: number;
   created_at: string;
