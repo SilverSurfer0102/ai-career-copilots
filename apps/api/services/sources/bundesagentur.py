@@ -64,7 +64,11 @@ def dedupe_hash(company: str | None, title: str, location: str | None) -> str:
 
 async def search_jobs(query: str, location: str = "", radius_km: int = 25, size: int = 25) -> list[dict]:
     """Returns a list of lightweight lead dicts (no full description yet —
-    call fetch_job_description for that, only once the user likes a lead)."""
+    call fetch_job_description for that, only once the user likes a lead).
+
+    Uses the v6 search endpoint — the old v4 "app/jobs" endpoint the mobile app
+    used to expose now returns a blanket 403 (confirmed live 2026-08-10; the
+    jobdetails endpoint below is unaffected and still v4)."""
     params = {
         "was": query,
         "angebotsart": 1,
@@ -76,24 +80,30 @@ async def search_jobs(query: str, location: str = "", radius_km: int = 25, size:
         params["wo"] = location
 
     async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get(f"{_BASE_URL}/pc/v4/app/jobs", params=params, headers=_HEADERS)
+        resp = await client.get(f"{_BASE_URL}/pc/v6/jobs", params=params, headers=_HEADERS)
         resp.raise_for_status()
         data = resp.json()
 
     leads = []
-    for entry in data.get("stellenangebote", []):
-        ort = entry.get("arbeitsort") or {}
+    for entry in data.get("ergebnisliste", []):
+        ort = (entry.get("stellenlokationen") or [{}])[0].get("adresse") or {}
         location_str = ", ".join(filter(None, [ort.get("plz"), ort.get("ort")]))
-        title = entry.get("titel", "")
-        company = entry.get("arbeitgeber")
+        title = entry.get("stellenangebotsTitel", "")
+        company = entry.get("firma")
+        # datumErsteVeroeffentlichung (not the more-recently-touched aenderungsdatum)
+        # is what actually reflects how old the listing is — BA regularly bumps
+        # aenderungsdatum on ads that have sat unfilled for years, which would
+        # silently defeat the staleness filter if used here instead.
+        posted_at = entry.get("datumErsteVeroeffentlichung")
+        starts_at = (entry.get("eintrittszeitraum") or {}).get("von")
         leads.append({
-            "external_id": entry.get("refnr"),
+            "external_id": entry.get("referenznummer"),
             "title": title,
             "company": company,
             "location": location_str,
-            "url": entry.get("externeUrl"),
-            "posted_at": entry.get("aktuelleVeroeffentlichungsdatum"),
-            "starts_at": entry.get("eintrittsdatum"),
+            "url": entry.get("externeURL"),
+            "posted_at": posted_at,
+            "starts_at": starts_at,
             "dedupe_hash": dedupe_hash(company, title, location_str),
         })
     return leads
