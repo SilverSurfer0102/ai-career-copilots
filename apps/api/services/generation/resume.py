@@ -23,7 +23,7 @@ from ._selection_context import (
 logger = logging.getLogger(__name__)
 
 MAX_BULLETS_PER_ENTRY = 4
-MAX_BULLETS_PER_ENTRY_GENERIC = 5
+MAX_BULLETS_PER_ENTRY_GENERIC = 4
 
 
 async def generate_resume(
@@ -94,7 +94,7 @@ async def generate_resume(
             "tailoring: include ALL projects (do not drop any for weak keyword match), pick the "
             "single strongest bullet for each one (space is tight across 7 entries), up to "
             f"{MAX_BULLETS_PER_ENTRY_GENERIC} bullets for the (few) work experience entries, "
-            "select a wider skill set (~20-25, still representative rather than exhaustive), and "
+            "select a wider skill set (~16-18, still representative rather than exhaustive), and "
             "pick the most versatile summary candidate — one that doesn't overcommit to a single "
             "narrow role. Achievements are dropped entirely in this mode (redundant with project "
             "bullets) — don't worry about achievement selection.\n\n"
@@ -225,16 +225,14 @@ def _assemble_resume_output(
         project_bullet_cap = bullet_cap
         if is_generic:
             project_bullet_cap = 1 if len(relevant_projects) >= 5 else 2
-        # When many projects compete for space, a bulletless one is better shown
-        # as a single compact line (title/date only) than padded out with a
-        # truncated abstract that gets cut off mid-sentence.
-        show_description_fallback = not (is_generic and len(relevant_projects) >= 5)
         items = []
+        minor_projects = []  # bulletless ones, folded into one compact trailing line
         for p in relevant_projects:
             bullets = _resolve_bullets(p.id, p.bullets, bullet_candidates, picks_by_parent, project_bullet_cap)
-            description = ""
-            if not bullets and show_description_fallback and p.description:
-                description = _truncate_at_word(p.description, 220)
+            if not bullets and is_generic and len(relevant_projects) >= 5:
+                minor_projects.append(f"{p.title} ({p.time_period})" if p.time_period else p.title)
+                continue
+            description = _truncate_at_word(p.description, 220) if not bullets and p.description else ""
             items.append({
                 "item_type": "project",
                 "title": p.title or "",
@@ -244,6 +242,14 @@ def _assemble_resume_output(
                 "bullets": bullets,
                 "description": description,
                 "metadata": {"parent_id": p.id},
+            })
+        if minor_projects:
+            items.append({
+                "item_type": "project",
+                "title": "Weitere Studienarbeiten" if lang == "de" else "Additional coursework projects",
+                "subtitle": None, "date_range": None, "location": None,
+                "bullets": [], "description": "; ".join(minor_projects),
+                "metadata": {},
             })
         sections.append({"section_type": "projects", "title": _section_title("projects", lang), "items": items})
 
@@ -265,6 +271,11 @@ def _assemble_resume_output(
     included_skill_ids = set(selection.get("included_skill_ids") or [])
     valid_skill_ids = {s.id for s in skills}
     selected_skills = [s for s in skills if s.id in included_skill_ids & valid_skill_ids] or skills
+    if is_generic:
+        # Don't just ask nicely and hope — the LLM's "~16-18" guidance is a
+        # suggestion, not a guarantee, and this is the one section still prone
+        # to blowing the page budget on its own.
+        selected_skills = selected_skills[:18]
     if selected_skills:
         group_labels = _SKILL_GROUP_LABELS_DE if lang == "de" else _SKILL_GROUP_LABELS_EN
         fallback_group = "Sonstige" if lang == "de" else "Other"
