@@ -25,7 +25,7 @@ _PLACEHOLDER_PATTERNS = [
     r"\bMuster(mann|frau|firma)?\b",
 ]
 
-_PAGE_LIMITS = {"resume": 2, "resume_pool": 3, "cover_letter": 1}
+_PAGE_LIMITS = {"resume": 2, "resume_pool": 2, "cover_letter": 1}
 
 
 def run_preflight(run: GenerationRun, session: Session) -> PreflightReport:
@@ -160,10 +160,10 @@ def _check_page_limit(run: GenerationRun, session: Session) -> PreflightCheck:
         return PreflightCheck(code="page_limit_error", label="Seitenzahl prüfbar", status="warn", detail=str(e))
 
     if page_count > limit:
-        # "resume" is the actually-sent document (tailored or general-profile) — a length
-        # miss there is a hard fail. resume_pool is an intentionally complete master
-        # inventory and cover_letter has its own salutation check, so those stay warnings.
-        status = "block" if run.run_type == "resume" else "warn"
+        # "resume"/"resume_pool" are both actually-sent documents (tailored, general-profile,
+        # or Pool-CV — all now share the same breadth-mode assembly) — a length miss there is
+        # a hard fail. cover_letter has its own salutation check, so that one stays a warning.
+        status = "block" if run.run_type in ("resume", "resume_pool") else "warn"
         return PreflightCheck(
             code="page_limit", label=f"Seitenzahl ≤ {limit}",
             status=status, detail=f"Dokument hat {page_count} Seite(n).",

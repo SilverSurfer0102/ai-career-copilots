@@ -6,10 +6,9 @@ from sqlmodel import Session, select
 from database import get_session
 from models import CandidateProfile, JobDescription, GenerationRun
 from schemas.generation import GenerationRequest, GenerationRunRead, OutputPatch, PoolResumeRequest
-from services.generation.resume import generate_resume
+from services.generation.resume import generate_resume, get_or_create_generic_job
 from services.generation.cover_letter import generate_cover_letter
 from services.generation.match_analysis import generate_match_analysis
-from services.generation.pool_resume import generate_pool_resume
 from services.feedback import get_feedback_context, log_edit
 
 router = APIRouter()
@@ -21,13 +20,12 @@ async def run_pool_resume_generation(
 ):
     if not session.get(CandidateProfile, payload.profile_id):
         raise HTTPException(status_code=404, detail="Profile not found")
+    generic_job = get_or_create_generic_job(session)
     feedback_ctx = get_feedback_context(payload.profile_id, session)
-    run = await generate_pool_resume(
-        profile_id=payload.profile_id,
-        options=payload.options,
-        feedback_context=feedback_ctx,
-        session=session,
+    request = GenerationRequest(
+        profile_id=payload.profile_id, job_id=generic_job.id, options=payload.options,
     )
+    run = await generate_resume(request, session, feedback_context=feedback_ctx, run_type="resume_pool")
     return run
 
 

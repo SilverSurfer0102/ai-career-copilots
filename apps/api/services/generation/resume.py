@@ -26,11 +26,30 @@ MAX_BULLETS_PER_ENTRY = 4
 MAX_BULLETS_PER_ENTRY_GENERIC = 4
 MAX_SKILLS_PER_GROUP = 8
 
+_GENERIC_JOB_TITLE = "Allgemeines Profil"
+
+
+def get_or_create_generic_job(session: Session) -> JobDescription:
+    """The one shared, profile-agnostic 'no specific job' placeholder that
+    triggers breadth mode in generate_resume(). JobDescription has no
+    profile_id — every candidate's Pool-CV reuses the same row."""
+    existing = session.exec(
+        select(JobDescription).where(JobDescription.title == _GENERIC_JOB_TITLE)
+    ).first()
+    if existing:
+        return existing
+    job = JobDescription(title=_GENERIC_JOB_TITLE, raw_text="")
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    return job
+
 
 async def generate_resume(
     payload: GenerationRequest,
     session: Session,
     feedback_context: str = "",
+    run_type: str = "resume",
 ) -> GenerationRun:
     profile = session.get(CandidateProfile, payload.profile_id)
     if not profile:
@@ -147,7 +166,7 @@ async def generate_resume(
         profile_id=payload.profile_id,
         job_description_id=payload.job_id,
         application_id=payload.application_id,
-        run_type="resume",
+        run_type=run_type,
         selected_evidence_ids=used_block_ids,
         generation_inputs={
             "profile_id": payload.profile_id,
