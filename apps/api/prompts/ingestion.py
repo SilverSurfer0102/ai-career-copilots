@@ -26,8 +26,15 @@ CRITICAL RULES:
 - If information is ambiguous or unclear, omit it rather than guess.
 - Preserve original wording for bullets and descriptions where possible.
 - Do not normalize or embellish company names, titles, or dates beyond what is written.
-- For academic documents: module names, course titles, and topics become skills (category: "domain") and education entries.
-- For papers: title, venue, abstract, keywords → publications; topics covered → skills.
+- For academic documents: module names, course titles, and topics become skills (category: "domain")
+  and education entries — but ONLY if they represent a transferable technical/professional
+  competency. Do NOT extract generic foundational coursework as skills merely because it appears
+  in a transcript (e.g. introductory chemistry, general physics, basic mechanics, bookkeeping) —
+  these describe the curriculum, not the candidate's competency profile. When in doubt, omit.
+- For papers/reports: only classify as "publications" if there is concrete evidence of external
+  publication or peer review (a journal, conference proceedings, DOI, or ISBN). A graded course
+  paper, seminar paper, or internal "Praxisprojekt" submitted only within a university course is a
+  "project", not a "publication" — even if it is written in a paper-like format.
 
 LANGUAGE HANDLING:
 - Documents may be written entirely in German. Extract all fields faithfully regardless of language.

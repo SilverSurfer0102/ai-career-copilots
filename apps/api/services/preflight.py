@@ -12,7 +12,7 @@ import re
 
 from sqlmodel import Session, select
 
-from models import GenerationRun, JobDescription, ContentBlock, CandidateProfile
+from models import GenerationRun, JobDescription, ContentBlock, CandidateProfile, Experience
 from schemas.preflight import PreflightCheck, PreflightReport, ApplicationPreflightReport
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def run_preflight(run: GenerationRun, session: Session) -> PreflightReport:
         checks.append(_check_company_referenced(job, text))
         checks.append(_check_salutation(outputs))
 
-    checks.append(_check_no_foreign_company(session, job, text))
+    checks.append(_check_no_foreign_company(session, job, text, run.profile_id))
     checks.append(_check_no_placeholders(text))
     checks.append(_check_only_approved_blocks(session, outputs, run.run_type))
     checks.append(_check_page_limit(run, session))
@@ -85,15 +85,27 @@ def _check_company_referenced(job: JobDescription | None, text: str) -> Prefligh
     return PreflightCheck(code="company_present", label="Firmenname im Anschreiben enthalten", status="pass")
 
 
-def _check_no_foreign_company(session: Session, job: JobDescription | None, text: str) -> PreflightCheck:
+def _check_no_foreign_company(session: Session, job: JobDescription | None, text: str, profile_id: str) -> PreflightCheck:
     current = (job.company or "").strip().lower() if job else ""
+    # A candidate's own past/current employer legitimately appears in their resume
+    # text regardless of which job they're applying to — only flag OTHER companies
+    # that were never actually the candidate's employer (real leftover-text leaks).
+    own_employers = {
+        (e or "").strip().lower()
+        for e in session.exec(
+            select(Experience.employer).where(Experience.profile_id == profile_id)
+        ).all()
+        if e
+    }
     other_companies = session.exec(
         select(JobDescription.company).where(JobDescription.company.is_not(None))
     ).all()
     text_lower = text.lower()
     leaked = sorted({
         c for c in other_companies
-        if c and c.strip() and c.strip().lower() != current and c.strip().lower() in text_lower
+        if c and c.strip() and c.strip().lower() != current
+        and not any(c.strip().lower() in emp or emp in c.strip().lower() for emp in own_employers)
+        and c.strip().lower() in text_lower
     })
     if leaked:
         return PreflightCheck(
@@ -148,9 +160,13 @@ def _check_page_limit(run: GenerationRun, session: Session) -> PreflightCheck:
         return PreflightCheck(code="page_limit_error", label="Seitenzahl prüfbar", status="warn", detail=str(e))
 
     if page_count > limit:
+        # "resume" is the actually-sent document (tailored or general-profile) — a length
+        # miss there is a hard fail. resume_pool is an intentionally complete master
+        # inventory and cover_letter has its own salutation check, so those stay warnings.
+        status = "block" if run.run_type == "resume" else "warn"
         return PreflightCheck(
             code="page_limit", label=f"Seitenzahl ≤ {limit}",
-            status="warn", detail=f"Dokument hat {page_count} Seite(n).",
+            status=status, detail=f"Dokument hat {page_count} Seite(n).",
         )
     return PreflightCheck(code="page_limit_ok", label=f"Seitenzahl ≤ {limit}", status="pass", detail=f"{page_count} Seite(n).")
 

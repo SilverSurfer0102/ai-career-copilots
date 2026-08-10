@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 MAX_BULLETS_PER_ENTRY = 4
 MAX_BULLETS_PER_ENTRY_GENERIC = 4
+MAX_SKILLS_PER_GROUP = 8
 
 
 async def generate_resume(
@@ -282,7 +283,7 @@ def _assemble_resume_output(
         by_cat: dict = defaultdict(list)
         for s in selected_skills:
             group = group_labels.get((s.category or "").lower(), fallback_group)
-            if s.name not in by_cat[group]:
+            if s.name not in by_cat[group] and len(by_cat[group]) < MAX_SKILLS_PER_GROUP:
                 by_cat[group].append(s.name)
         sections.append({
             "section_type": "skills",
